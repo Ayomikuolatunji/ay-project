@@ -302,14 +302,22 @@ function showAccountMenu(trigger = null) {
   setText('#account-popover-name', state.user?.name || 'Demo visitor');
   setText('#account-popover-email', state.user?.email || 'demo@regulai.local');
   accountPopover.hidden = false;
+  syncAccountMenuState(true);
   accountPopover.querySelector('[data-action="reset-demo"]')?.focus();
 }
 
 function closeAccountMenu() {
   if (!accountPopover || accountPopover.hidden) return;
   accountPopover.hidden = true;
+  syncAccountMenuState(false);
   accountMenuTrigger?.focus();
   accountMenuTrigger = null;
+}
+
+function syncAccountMenuState(open) {
+  document.querySelectorAll('[data-action="account-menu"]').forEach((button) => {
+    button.setAttribute('aria-expanded', String(open));
+  });
 }
 
 function resetDemo() {
