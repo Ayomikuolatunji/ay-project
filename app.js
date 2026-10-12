@@ -112,6 +112,12 @@ function syncLanguageControls() {
 
 function navigate(route, updateHash = true) {
   const targetRoute = validRoutes.has(route) ? route : 'landing';
+  if (targetRoute === 'dashboard' && !state.user) {
+    if (window.location.hash !== '#login') history.replaceState(null, '', '#login');
+    navigate('login', false);
+    showToast('Sign in to open your workspace.');
+    return;
+  }
   setMobileMenu(false);
   if (targetRoute === 'landing') setActiveLandingSection(null);
 
@@ -316,6 +322,37 @@ function handleLoginSubmit(form) {
   showToast('Welcome back. Your workspace is ready.');
 }
 
+function resetLoginForm() {
+  const form = document.querySelector('#login-form');
+  const password = document.querySelector('#login-password');
+  const toggle = document.querySelector('[data-action="toggle-password"]');
+  form?.reset();
+  if (password) password.type = 'password';
+  if (toggle) {
+    toggle.textContent = 'Show password';
+    toggle.setAttribute('aria-pressed', 'false');
+  }
+  setError('#login-error', '');
+}
+
+function handleSignOut() {
+  state.user = null;
+  saveState();
+  resetLoginForm();
+  navigate('login');
+  showToast('You’re signed out. Your application is saved.');
+}
+
+function togglePasswordVisibility() {
+  const password = document.querySelector('#login-password');
+  const toggle = document.querySelector('[data-action="toggle-password"]');
+  if (!password || !toggle) return;
+  const isVisible = password.type === 'text';
+  password.type = isVisible ? 'password' : 'text';
+  toggle.textContent = isVisible ? 'Show password' : 'Hide password';
+  toggle.setAttribute('aria-pressed', String(!isVisible));
+}
+
 function handleDemoLogin() {
   state.user = { email: 'ayo@regulai.demo', name: 'Ayo Olatunji' };
   if (!state.draft) state.draft = createRegistrationDraft({ businessName: 'Ayo’s Table', language: state.language });
@@ -373,6 +410,8 @@ function handleClick(event) {
   }
 
   if (action === 'demo-login') handleDemoLogin();
+  if (action === 'sign-out') handleSignOut();
+  if (action === 'toggle-password') togglePasswordVisibility();
   if (action === 'open-chat') showToast('Mock RegulAI guide opened — ask about documents, names, or status.');
   if (action === 'brand-preview') showToast('Brand kit preview is queued for after filing.');
   if (action === 'notifications') showToast('You’re all caught up.');

@@ -495,6 +495,14 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .form-field input::placeholder { color: #a9b1aa; }
 
+.password-input-wrap { position: relative; }
+
+.password-input-wrap input { padding-right: 86px; }
+
+.password-toggle { position: absolute; top: 50%; right: 9px; padding: 4px; transform: translateY(-50%); background: transparent; color: var(--purple); font-size: 9px; font-weight: 750; }
+
+.password-toggle:hover { color: var(--orange); }
+
 .form-error { min-height: 17px; margin: -5px 0 9px; color: #c75e4a; font-size: 10px; }
 
 .auth-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0 16px; color: var(--muted); font-size: 10px; }
