@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   createRegistrationDraft,
+  createBrandKit,
   getRegistrationProgress,
   getRegulAIReply,
   validateDocumentFile,
@@ -34,6 +35,7 @@ test('creates a registration draft with the details needed for review', () => {
   assert.equal(draft.description, 'A neighbourhood food business');
   assert.equal(draft.language, 'en');
   assert.equal(draft.stage, 'data');
+  assert.equal(draft.brandKit.themeId, 'meadow');
   assert.match(draft.id, /^reg-/);
 });
 
@@ -80,4 +82,19 @@ test('checks document type and size before marking a file ready', () => {
     mimeType: 'image/jpeg',
     size: 6_000_000,
   }), { valid: false, message: 'Keep each document under 5 MB.' });
+});
+
+test('creates a personalized brand direction from the registration details', () => {
+  const brandKit = createBrandKit({
+    businessName: " Ayo's Table ",
+    description: 'Neighbourhood meals for good company.',
+    themeId: 'sunset',
+  });
+
+  assert.equal(brandKit.businessName, "Ayo's Table");
+  assert.equal(brandKit.initials, 'AT');
+  assert.equal(brandKit.descriptor, 'Neighbourhood meals for good company');
+  assert.equal(brandKit.theme.id, 'sunset');
+  assert.equal(brandKit.theme.label, 'Sunset studio');
+  assert.equal(createBrandKit({ businessName: 'Ayo Foods', themeId: 'unknown' }).theme.id, 'meadow');
 });

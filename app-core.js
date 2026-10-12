@@ -6,6 +6,59 @@ export function isValidEmail(value = '') {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+const brandKitThemes = {
+  meadow: {
+    id: 'meadow',
+    label: 'Meadow studio',
+    background: '#132b29',
+    accent: '#d2f26b',
+    secondary: '#f18e66',
+    surface: '#f4f5ef',
+    muted: '#6c8d83',
+  },
+  sunset: {
+    id: 'sunset',
+    label: 'Sunset studio',
+    background: '#3b2630',
+    accent: '#ffd089',
+    secondary: '#ee785e',
+    surface: '#fff0e7',
+    muted: '#a46d72',
+  },
+  indigo: {
+    id: 'indigo',
+    label: 'Indigo studio',
+    background: '#27254e',
+    accent: '#d9d4ff',
+    secondary: '#f0a06d',
+    surface: '#f4f2ff',
+    muted: '#8b86bc',
+  },
+};
+
+function getBrandKitTheme(themeId = 'meadow') {
+  return brandKitThemes[themeId] || brandKitThemes.meadow;
+}
+
+export function createBrandKit({ businessName = '', description = '', themeId = 'meadow' } = {}) {
+  const normalizedName = normalizeBusinessName(businessName) || 'Your business';
+  const nameWords = normalizedName
+    .replace(/[^A-Za-z0-9À-ÿ'\s]/g, ' ')
+    .split(/\s+/)
+    .map((word) => word.replace(/^'+|'+$/g, ''))
+    .filter(Boolean);
+  const initials = (nameWords.slice(0, 2).map((word) => word[0]).join('') || 'YB').toUpperCase();
+  const firstSentence = normalizeBusinessName(description).split(/[.!?]/)[0].trim();
+  const descriptor = firstSentence.slice(0, 72).trim() || 'Made to move your business forward';
+
+  return {
+    businessName: normalizedName,
+    initials,
+    descriptor,
+    theme: getBrandKitTheme(themeId),
+  };
+}
+
 export function createRegistrationDraft({
   businessName = '',
   businessType = 'Business Name',
@@ -30,6 +83,9 @@ export function createRegistrationDraft({
     documentErrors: {
       identity: '',
       passport: '',
+    },
+    brandKit: {
+      themeId: 'meadow',
     },
     payment: 'pending',
   };

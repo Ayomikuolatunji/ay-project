@@ -1,4 +1,5 @@
 import {
+  createBrandKit,
   createRegistrationDraft,
   getRegistrationProgress,
   getRegulAIReply,
@@ -27,14 +28,18 @@ const defaultState = {
   language: 'en',
   user: null,
   draft: null,
+  brandKit: { themeId: 'meadow' },
   registrationStep: 'data',
 };
 
 let state = loadState();
 let toastTimeout;
+let brandPreviewTrigger = null;
+let brandPreviewThemeId = 'meadow';
 
 const screens = [...document.querySelectorAll('[data-screen]')];
 const toast = document.querySelector('#toast');
+const brandModal = document.querySelector('#brand-modal');
 const publicNav = document.querySelector('.public-nav');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const mobileMenu = document.querySelector('[data-mobile-menu]');
@@ -127,6 +132,101 @@ function resetGuideChat() {
   document.querySelector('#chat-form')?.setAttribute('hidden', '');
   document.querySelector('.chat-start-button')?.removeAttribute('hidden');
   document.querySelectorAll('.quick-question').forEach((question) => question.removeAttribute('hidden'));
+}
+
+function activeBrandKit(themeId = state.draft?.brandKit?.themeId || state.brandKit?.themeId || 'meadow') {
+  return createBrandKit({
+    businessName: state.draft?.businessName || 'Ayo’s Table',
+    description: state.draft?.description || 'Warm meals. Good company.',
+    themeId,
+  });
+}
+
+function paintSwatches(selector, colors) {
+  document.querySelectorAll(selector).forEach((swatch, index) => {
+    swatch.style.backgroundColor = colors[index] || '';
+  });
+}
+
+function renderDashboardBrandKit() {
+  const kit = activeBrandKit();
+  const preview = document.querySelector('#dashboard-brand-preview');
+  const logo = document.querySelector('#dashboard-brand-preview .brand-kit-logo');
+  const plus = document.querySelector('#dashboard-brand-preview .brand-kit-plus');
+  const name = document.querySelector('#dashboard-brand-name');
+  const tagline = document.querySelector('#dashboard-brand-tagline');
+  if (!preview || !logo || !plus || !name || !tagline) return;
+
+  document.querySelector('#dashboard-brand-initials').textContent = kit.initials;
+  name.textContent = kit.businessName;
+  tagline.textContent = kit.descriptor;
+  preview.style.backgroundColor = kit.theme.background;
+  logo.style.borderColor = kit.theme.accent;
+  logo.style.color = kit.theme.accent;
+  plus.style.color = kit.theme.secondary;
+  paintSwatches('[data-brand-dashboard-swatch]', [kit.theme.accent, kit.theme.secondary, kit.theme.surface]);
+}
+
+function renderBrandPreview() {
+  const kit = activeBrandKit(brandPreviewThemeId);
+  const preview = document.querySelector('#brand-large-preview');
+  if (!preview) return;
+
+  document.querySelector('#brand-preview-initials').textContent = kit.initials;
+  document.querySelector('#brand-preview-name').textContent = kit.businessName;
+  document.querySelector('#brand-preview-descriptor').textContent = kit.descriptor;
+  document.querySelector('#brand-theme-label').textContent = kit.theme.label;
+  document.querySelector('#brand-modal-copy').textContent = `A ${kit.theme.label.toLowerCase()} direction built around ${kit.businessName}.`;
+  preview.style.backgroundColor = kit.theme.background;
+  preview.style.setProperty('--brand-preview-accent', kit.theme.accent);
+  preview.style.setProperty('--brand-preview-secondary', kit.theme.secondary);
+  paintSwatches('[data-brand-preview-swatch]', [kit.theme.accent, kit.theme.secondary, kit.theme.surface, kit.theme.muted]);
+  document.querySelectorAll('[data-action="select-brand-theme"]').forEach((button) => {
+    const isSelected = button.dataset.brandTheme === brandPreviewThemeId;
+    button.classList.toggle('is-selected', isSelected);
+    button.setAttribute('aria-pressed', String(isSelected));
+  });
+}
+
+function showBrandPreview(trigger = null) {
+  if (!brandModal) return;
+  brandPreviewTrigger = trigger;
+  brandPreviewThemeId = activeBrandKit(state.draft?.brandKit?.themeId || state.brandKit?.themeId || 'meadow').theme.id;
+  renderBrandPreview();
+  brandModal.hidden = false;
+  document.body.classList.add('brand-modal-open');
+  brandModal.querySelector('.brand-modal-close')?.focus();
+}
+
+function closeBrandPreview() {
+  if (!brandModal || brandModal.hidden) return;
+  brandModal.hidden = true;
+  document.body.classList.remove('brand-modal-open');
+  brandPreviewTrigger?.focus();
+  brandPreviewTrigger = null;
+}
+
+function saveBrandKitDirection() {
+  const kit = activeBrandKit(brandPreviewThemeId);
+  state.brandKit = { ...(state.brandKit || {}), themeId: brandPreviewThemeId };
+  if (state.draft) state.draft.brandKit = { ...(state.draft.brandKit || {}), themeId: brandPreviewThemeId };
+  saveState();
+  renderDashboardBrandKit();
+  closeBrandPreview();
+  showToast(`${kit.theme.label} saved to your workspace.`);
+}
+
+function copyBrandProfile() {
+  const kit = activeBrandKit(brandPreviewThemeId);
+  const profile = `${kit.businessName}\n${kit.descriptor}\n\nStarter kit: logo concept, company profile, and landing-page direction.`;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(profile).then(
+      () => showToast('Company profile copied.'),
+      () => showToast('Company profile is ready to copy in this preview.'),
+    );
+    return;
+  }
+  showToast('Company profile is ready to copy in this preview.');
 }
 
 function showGuideChat(question = '') {
@@ -371,6 +471,7 @@ function renderDashboard() {
     const active = index === currentIndex;
     return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span>${item.label}</span></div>`;
   }).join('');
+  renderDashboardBrandKit();
   resetGuideChat();
 }
 
@@ -534,7 +635,27 @@ function handleClick(event) {
   if (action === 'sign-out') handleSignOut();
   if (action === 'toggle-password') togglePasswordVisibility();
   if (action === 'open-chat') showGuideChat(actionButton.dataset.chatQuestion || '');
-  if (action === 'brand-preview') showToast('Brand kit preview is queued for after filing.');
+  if (action === 'brand-preview') {
+    showBrandPreview(actionButton);
+    return;
+  }
+  if (action === 'close-brand-preview') {
+    closeBrandPreview();
+    return;
+  }
+  if (action === 'select-brand-theme') {
+    brandPreviewThemeId = actionButton.dataset.brandTheme || 'meadow';
+    renderBrandPreview();
+    return;
+  }
+  if (action === 'save-brand-kit') {
+    saveBrandKitDirection();
+    return;
+  }
+  if (action === 'copy-brand-profile') {
+    copyBrandProfile();
+    return;
+  }
   if (action === 'notifications') showToast('You’re all caught up.');
   if (action === 'account-menu') showToast('Account menu is mocked for this prototype.');
   if (action === 'forgot-password') showToast('Password reset is mocked for this prototype.');
@@ -571,9 +692,14 @@ function handleHashChange() {
   navigate(validRoutes.has(route) ? route : 'landing', false);
 }
 
+function handleKeydown(event) {
+  if (event.key === 'Escape' && brandModal && !brandModal.hidden) closeBrandPreview();
+}
+
 document.addEventListener('click', handleClick);
 document.addEventListener('submit', handleSubmit);
 document.addEventListener('change', handleChange);
+document.addEventListener('keydown', handleKeydown);
 window.addEventListener('hashchange', handleHashChange);
 
 const initialRoute = window.location.hash.slice(1);
