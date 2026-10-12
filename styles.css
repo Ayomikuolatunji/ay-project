@@ -1099,7 +1099,7 @@ body.timeline-modal-open { overflow: hidden; }
   .dashboard-sidebar { display: none; }
   .dashboard-topbar { min-height: 75px; padding: 0 16px; }
   .dashboard-topbar h1 { font-size: 19px; }
-  .dashboard-top-actions .language-control { display: none; }
+  .dashboard-top-actions .language-control { display: inline-flex; }
   .dashboard-content { padding: 34px 16px 55px; }
   .dashboard-heading-row { align-items: flex-start; flex-direction: column; }
   .dashboard-heading-row .button { width: 100%; }

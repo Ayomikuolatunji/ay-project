@@ -32,4 +32,4 @@ Then open [http://localhost:4173](http://localhost:4173).
 npm test
 ```
 
-The automated tests cover the registration-state helpers, localized workspace copy, and contextual registration guidance. The browser smoke pass covers the landing page, mobile landing page, login validation, registration details, mock document checks, mock payment, dashboard handoff, brand-kit preview interactions, application timeline states, language preference changes, and desktop/mobile registration guide behavior.
+The automated tests cover the registration-state helpers, localized workspace copy, and contextual registration guidance. The browser smoke pass covers the landing page, mobile landing page, login validation, registration details, mock document checks, mock payment, dashboard handoff, brand-kit preview interactions, application timeline states, language preference changes on desktop and mobile, and desktop/mobile registration guide behavior.
