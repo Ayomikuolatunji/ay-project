@@ -53,3 +53,22 @@ export function getRegistrationProgress(stage = 'data') {
 
   return progressByStage[stage] ?? progressByStage.data;
 }
+
+export function getRegulAIReply(question = '') {
+  const normalizedQuestion = String(question ?? '').toLowerCase();
+
+  if (/(document|identity|passport|upload)/.test(normalizedQuestion)) {
+    return 'For this demo, prepare a government-issued identity document and a passport photograph. Use the mock checks to mark both ready.';
+  }
+  if (/(long|time|when|soon|turnaround)/.test(normalizedQuestion)) {
+    return 'Your application moves from business details to document check, payment, and verification. The dashboard shows each stage as it changes.';
+  }
+  if (/(pay|fee|cost|price|charge)/.test(normalizedQuestion)) {
+    return 'This prototype uses a ₦25,000 sandbox filing fee. No real payment is taken.';
+  }
+  if (/(status|progress|application|where)/.test(normalizedQuestion)) {
+    return 'Your workspace tracks data, payment, verification, CAC waiting, and registration in one view.';
+  }
+
+  return 'I can help with documents, timing, payment, or your current application status. Try one of those questions.';
+}

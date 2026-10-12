@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   createRegistrationDraft,
   getRegistrationProgress,
+  getRegulAIReply,
   isValidEmail,
   normalizeBusinessName,
   validateRegistrationDetails,
@@ -50,4 +51,11 @@ test('reports the guided registration progress by stage', () => {
   assert.equal(getRegistrationProgress('documents'), 50);
   assert.equal(getRegistrationProgress('payment'), 75);
   assert.equal(getRegistrationProgress('registered'), 100);
+});
+
+test('returns grounded guidance for the dashboard assistant topics', () => {
+  assert.match(getRegulAIReply('What documents do I need?'), /government-issued identity document/i);
+  assert.match(getRegulAIReply('How long does registration take?'), /dashboard shows each stage/i);
+  assert.match(getRegulAIReply('How much is payment?'), /₦25,000 sandbox filing fee/i);
+  assert.match(getRegulAIReply('hello'), /documents, timing, payment, or your current application status/i);
 });

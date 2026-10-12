@@ -755,19 +755,39 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .online-label { color: var(--lime-dark); font-size: 9px; font-weight: 700; }
 
-.dashboard-chat-messages { display: grid; gap: 9px; margin: 20px 0 16px; }
+.dashboard-chat-messages { display: grid; max-height: 220px; gap: 9px; margin: 20px 0 16px; overflow-y: auto; padding-right: 3px; }
 
 .dashboard-message { display: flex; align-items: flex-start; gap: 8px; }
 
 .dashboard-message p { max-width: 330px; margin: 0; padding: 9px 10px; border-radius: 8px 8px 8px 2px; background: var(--paper); color: var(--ink-soft); font-size: 10px; }
 
+.dashboard-message-user { justify-content: flex-end; }
+
+.dashboard-message-user p { border-radius: 8px 8px 2px 8px; background: var(--deep); color: #edf4e9; }
+
 .quick-question { display: flex; align-items: center; justify-content: space-between; width: min(100%, 330px); padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--white); color: var(--ink-soft); font-size: 9px; text-align: left; }
+
+.quick-question[hidden], .chat-start-button[hidden] { display: none; }
 
 .quick-question:hover { border-color: var(--purple); color: var(--purple); }
 
 .quick-question span, .chat-start-button span { color: var(--purple); font-size: 13px; }
 
 .chat-start-button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 11px 0 0; border-top: 1px solid var(--line); background: transparent; color: var(--ink); font-size: 10px; font-weight: 720; }
+
+.chat-composer { display: flex; align-items: center; gap: 7px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+.chat-composer[hidden] { display: none; }
+
+.chat-composer input { min-width: 0; flex: 1; height: 35px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; outline: 0; background: var(--paper); color: var(--ink); font-size: 10px; }
+
+.chat-composer input:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(116,106,202,.11); }
+
+.chat-composer input::placeholder { color: var(--muted); }
+
+.chat-composer button { display: grid; width: 35px; height: 35px; flex: 0 0 auto; place-items: center; border-radius: 7px; background: var(--purple); color: var(--white); font-size: 15px; }
+
+.chat-composer button:hover { background: var(--deep); }
 
 .brand-preview-panel { background: var(--paper-deep); }
 

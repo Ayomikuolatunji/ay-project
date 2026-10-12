@@ -1,6 +1,7 @@
 import {
   createRegistrationDraft,
   getRegistrationProgress,
+  getRegulAIReply,
   isValidEmail,
   normalizeBusinessName,
   validateRegistrationDetails,
@@ -96,6 +97,65 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add('is-visible');
   toastTimeout = setTimeout(() => toast.classList.remove('is-visible'), 2600);
+}
+
+function appendChatMessage(message, role = 'ai') {
+  const messages = document.querySelector('#dashboard-chat-messages');
+  if (!messages) return;
+
+  const item = document.createElement('div');
+  item.className = `dashboard-message dashboard-message-${role}`;
+  item.dataset.chatGenerated = 'true';
+
+  if (role === 'ai') {
+    const avatar = document.createElement('span');
+    avatar.className = 'mini-avatar';
+    avatar.textContent = 'R';
+    item.append(avatar);
+  }
+
+  const bubble = document.createElement('p');
+  bubble.textContent = message;
+  item.append(bubble);
+  messages.append(item);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function resetGuideChat() {
+  document.querySelectorAll('[data-chat-generated]').forEach((message) => message.remove());
+  document.querySelector('#chat-form')?.setAttribute('hidden', '');
+  document.querySelector('.chat-start-button')?.removeAttribute('hidden');
+  document.querySelectorAll('.quick-question').forEach((question) => question.removeAttribute('hidden'));
+}
+
+function showGuideChat(question = '') {
+  const form = document.querySelector('#chat-form');
+  if (!form) return;
+
+  form.removeAttribute('hidden');
+  document.querySelector('.chat-start-button')?.setAttribute('hidden', '');
+  document.querySelectorAll('.quick-question').forEach((quickQuestion) => quickQuestion.setAttribute('hidden', ''));
+
+  if (question) {
+    appendChatMessage(question, 'user');
+    appendChatMessage(getRegulAIReply(question));
+  }
+
+  document.querySelector('#chat-input')?.focus();
+}
+
+function handleChatSubmit(form) {
+  const input = form.querySelector('#chat-input');
+  const message = String(new FormData(form).get('message') || '').trim();
+  if (!message) {
+    input?.focus();
+    return;
+  }
+
+  appendChatMessage(message, 'user');
+  appendChatMessage(getRegulAIReply(message));
+  form.reset();
+  input?.focus();
 }
 
 function setMobileMenu(open) {
@@ -246,6 +306,7 @@ function renderDashboard() {
 
   document.querySelector('#dashboard-user-name').textContent = userName;
   document.querySelector('#dashboard-first-name').textContent = userName.split(' ')[0];
+  document.querySelector('#dashboard-chat-greeting').textContent = `Hi ${userName.split(' ')[0]}. What would you like to make clearer today?`;
   document.querySelector('#dashboard-business-name').textContent = displayName;
   document.querySelector('#dashboard-registration-type').textContent = `${draft?.businessType || 'Business Name'} registration · Started today`;
   document.querySelector('#dashboard-progress-number').textContent = `${progress}%`;
@@ -255,6 +316,7 @@ function renderDashboard() {
     const active = index === currentIndex;
     return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span>${item.label}</span></div>`;
   }).join('');
+  resetGuideChat();
 }
 
 function setError(selector, message) {
@@ -420,7 +482,7 @@ function handleClick(event) {
   if (action === 'demo-login') handleDemoLogin();
   if (action === 'sign-out') handleSignOut();
   if (action === 'toggle-password') togglePasswordVisibility();
-  if (action === 'open-chat') showToast('Mock RegulAI guide opened — ask about documents, names, or status.');
+  if (action === 'open-chat') showGuideChat(actionButton.dataset.chatQuestion || '');
   if (action === 'brand-preview') showToast('Brand kit preview is queued for after filing.');
   if (action === 'notifications') showToast('You’re all caught up.');
   if (action === 'account-menu') showToast('Account menu is mocked for this prototype.');
@@ -436,6 +498,7 @@ function handleSubmit(event) {
   if (event.target.id === 'business-form') handleBusinessSubmit(event.target);
   if (event.target.id === 'document-form') handleDocumentSubmit();
   if (event.target.id === 'payment-form') handlePaymentSubmit();
+  if (event.target.id === 'chat-form') handleChatSubmit(event.target);
 }
 
 function handleChange(event) {
