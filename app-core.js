@@ -351,6 +351,49 @@ export function getApplicationTimeline(stage = 'data') {
   }));
 }
 
+const registrationGuidance = {
+  data: {
+    id: 'data',
+    eyebrow: 'Step 1 of 3 · Business details',
+    title: 'Start with the idea, not the paperwork.',
+    intro: 'A working name is enough for this first step. You can refine the details before filing.',
+    items: [
+      { title: 'Name or idea', body: 'Use the name you are considering, even if it is not final yet.' },
+      { title: 'Business type', body: 'Choose the structure that best matches how you plan to operate.' },
+      { title: 'Plain-language description', body: 'Explain what you sell, make, or help people do.' },
+    ],
+    footer: 'Your details stay saved in this browser while you work.',
+  },
+  documents: {
+    id: 'documents',
+    eyebrow: 'Step 2 of 3 · Document check',
+    title: 'Let’s get your documents ready.',
+    intro: 'Clear files help avoid back-and-forth. This prototype checks the file type and size before you continue.',
+    items: [
+      { title: 'Identity document', body: 'Prepare a government-issued identity document such as a National ID, driver’s licence, or passport.' },
+      { title: 'Passport photograph', body: 'Use a recent JPG or PNG photo with a plain background.' },
+      { title: 'One file at a time', body: 'Choose a file or use a demo file, then wait for the Ready status before reviewing.' },
+    ],
+    footer: 'Keep each file clear and under 5 MB for this prototype.',
+  },
+  payment: {
+    id: 'payment',
+    eyebrow: 'Step 3 of 3 · Payment & filing',
+    title: 'Review once, then queue the application.',
+    intro: 'Check the summary, confirm the sandbox filing fee, and submit when the details look right.',
+    items: [
+      { title: 'Review your details', body: 'Make sure the business name, type, and description say what you mean.' },
+      { title: 'Sandbox payment', body: 'This demo shows a ₦25,000 filing fee. No real payment is taken.' },
+      { title: 'Track what happens next', body: 'After submission, your dashboard shows verification, CAC waiting, and registration stages.' },
+    ],
+    footer: 'You can return to earlier steps before submitting the mock application.',
+  },
+};
+
+export function getRegistrationGuidance(step = 'data') {
+  return registrationGuidance[step] || registrationGuidance.data;
+}
+
 export function getRegulAIReply(question = '') {
   const normalizedQuestion = String(question ?? '').toLowerCase();
 

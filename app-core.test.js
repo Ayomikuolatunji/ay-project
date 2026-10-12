@@ -6,6 +6,7 @@ import {
   createBrandKit,
   getRegistrationProgress,
   getApplicationTimeline,
+  getRegistrationGuidance,
   getLocalizedCopy,
   getRegulAIReply,
   validateDocumentFile,
@@ -71,6 +72,17 @@ test('derives the application timeline state from the current stage', () => {
   assert.equal(timeline[2].label, 'Verifying');
   assert.match(timeline[2].note, /document check/i);
   assert.equal(getApplicationTimeline('unknown')[0].status, 'current');
+});
+
+test('returns contextual guidance for a registration step with a safe fallback', () => {
+  assert.deepEqual(['data', 'documents', 'payment'].map((step) => getRegistrationGuidance(step).id), ['data', 'documents', 'payment']);
+  const documents = getRegistrationGuidance('documents');
+
+  assert.equal(documents.id, 'documents');
+  assert.equal(documents.title, 'Let’s get your documents ready.');
+  assert.equal(documents.items[0].title, 'Identity document');
+  assert.match(documents.items[0].body, /government-issued/i);
+  assert.equal(getRegistrationGuidance('unknown').id, 'data');
 });
 
 test('returns localized workspace copy with a safe English fallback', () => {

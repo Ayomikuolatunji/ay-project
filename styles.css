@@ -988,6 +988,20 @@ body.timeline-modal-open { overflow: hidden; }
 
 .timeline-modal-footer > span i { display: inline-block; width: 5px; height: 5px; margin: 0 4px 1px 0; border-radius: 50%; background: var(--orange); }
 
+.guide-modal-card { width: min(620px, 100%); }
+
+.guide-modal-heading { margin-bottom: 24px; }
+
+.guide-modal-list { display: grid; border-top: 1px solid var(--line); }
+
+.guide-item { display: grid; grid-template-columns: 32px 1fr; gap: 11px; padding: 15px 0; border-bottom: 1px solid var(--line); }
+
+.guide-item-number { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; background: var(--lime); color: var(--deep); font-size: 9px; font-weight: 800; }
+
+.guide-item strong { display: block; margin: 1px 0 4px; color: var(--ink-soft); font-size: 11px; }
+
+.guide-item p { max-width: 450px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+
 .toast { position: fixed; z-index: 40; right: 22px; bottom: 22px; max-width: min(360px, calc(100vw - 44px)); padding: 11px 14px; transform: translateY(16px); border: 1px solid #315148; border-radius: 8px; background: var(--deep); color: #edf4e9; box-shadow: var(--shadow); font-size: 11px; opacity: 0; pointer-events: none; transition: opacity var(--ease), transform var(--ease); }
 
 .toast.is-visible { transform: translateY(0); opacity: 1; }
@@ -1071,7 +1085,7 @@ body.timeline-modal-open { overflow: hidden; }
   .flow-steps { grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 22px 0 35px; }
   .flow-step { min-height: 35px; justify-content: center; padding: 0 4px; font-size: 0; }
   .flow-step-marker { width: 24px; height: 24px; font-size: 9px; }
-  .flow-help { display: none; }
+  .flow-help { display: flex; margin: 0 0 30px; padding: 0 0 16px; border-top: 0; border-bottom: 1px solid var(--line); }
   .flow-stage-heading h1 { font-size: 39px; }
   .form-grid, .review-grid { grid-template-columns: 1fr; gap: 0; }
   .flow-form-card { padding: 16px; }

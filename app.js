@@ -3,6 +3,7 @@ import {
   createRegistrationDraft,
   getApplicationTimeline,
   getLocalizedCopy,
+  getRegistrationGuidance,
   getRegistrationProgress,
   getRegulAIReply,
   isValidEmail,
@@ -31,11 +32,13 @@ let toastTimeout;
 let brandPreviewTrigger = null;
 let brandPreviewThemeId = 'meadow';
 let timelineTrigger = null;
+let guideTrigger = null;
 
 const screens = [...document.querySelectorAll('[data-screen]')];
 const toast = document.querySelector('#toast');
 const brandModal = document.querySelector('#brand-modal');
 const timelineModal = document.querySelector('#timeline-modal');
+const guideModal = document.querySelector('#guide-modal');
 const publicNav = document.querySelector('.public-nav');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const mobileMenu = document.querySelector('[data-mobile-menu]');
@@ -257,6 +260,38 @@ function closeApplicationTimeline() {
   document.body.classList.remove('timeline-modal-open');
   timelineTrigger?.focus();
   timelineTrigger = null;
+}
+
+function renderRegistrationGuide() {
+  const guidance = getRegistrationGuidance(state.registrationStep);
+  setText('#guide-modal-eyebrow', guidance.eyebrow);
+  setText('#guide-modal-title', guidance.title);
+  setText('#guide-modal-intro', guidance.intro);
+  setText('#guide-modal-footer-copy', guidance.footer);
+  const list = document.querySelector('#guide-modal-list');
+  if (!list) return;
+
+  list.innerHTML = guidance.items.map((item, index) => `<div class="guide-item">
+    <span class="guide-item-number">${String(index + 1).padStart(2, '0')}</span>
+    <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></div>
+  </div>`).join('');
+}
+
+function showRegistrationGuide(trigger = null) {
+  if (!guideModal) return;
+  guideTrigger = trigger;
+  renderRegistrationGuide();
+  guideModal.hidden = false;
+  document.body.classList.add('guide-modal-open');
+  guideModal.querySelector('.guide-modal-close')?.focus();
+}
+
+function closeRegistrationGuide() {
+  if (!guideModal || guideModal.hidden) return;
+  guideModal.hidden = true;
+  document.body.classList.remove('guide-modal-open');
+  guideTrigger?.focus();
+  guideTrigger = null;
 }
 
 function showGuideChat(question = '') {
@@ -704,6 +739,14 @@ function handleClick(event) {
     closeApplicationTimeline();
     return;
   }
+  if (action === 'open-registration-guide') {
+    showRegistrationGuide(actionButton);
+    return;
+  }
+  if (action === 'close-registration-guide') {
+    closeRegistrationGuide();
+    return;
+  }
   if (action === 'brand-preview') {
     showBrandPreview(actionButton);
     return;
@@ -768,6 +811,7 @@ function handleKeydown(event) {
   if (event.key !== 'Escape') return;
   if (timelineModal && !timelineModal.hidden) closeApplicationTimeline();
   if (brandModal && !brandModal.hidden) closeBrandPreview();
+  if (guideModal && !guideModal.hidden) closeRegistrationGuide();
 }
 
 document.addEventListener('click', handleClick);
