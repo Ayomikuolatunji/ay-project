@@ -33,12 +33,14 @@ let brandPreviewTrigger = null;
 let brandPreviewThemeId = 'meadow';
 let timelineTrigger = null;
 let guideTrigger = null;
+let accountMenuTrigger = null;
 
 const screens = [...document.querySelectorAll('[data-screen]')];
 const toast = document.querySelector('#toast');
 const brandModal = document.querySelector('#brand-modal');
 const timelineModal = document.querySelector('#timeline-modal');
 const guideModal = document.querySelector('#guide-modal');
+const accountPopover = document.querySelector('#account-popover');
 const publicNav = document.querySelector('.public-nav');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const mobileMenu = document.querySelector('[data-mobile-menu]');
@@ -292,6 +294,33 @@ function closeRegistrationGuide() {
   document.body.classList.remove('guide-modal-open');
   guideTrigger?.focus();
   guideTrigger = null;
+}
+
+function showAccountMenu(trigger = null) {
+  if (!accountPopover) return;
+  accountMenuTrigger = trigger;
+  setText('#account-popover-name', state.user?.name || 'Demo visitor');
+  setText('#account-popover-email', state.user?.email || 'demo@regulai.local');
+  accountPopover.hidden = false;
+  accountPopover.querySelector('[data-action="reset-demo"]')?.focus();
+}
+
+function closeAccountMenu() {
+  if (!accountPopover || accountPopover.hidden) return;
+  accountPopover.hidden = true;
+  accountMenuTrigger?.focus();
+  accountMenuTrigger = null;
+}
+
+function resetDemo() {
+  if (!window.confirm('Restart the demo and clear this browser’s saved application?')) return;
+  const language = state.language || defaultState.language;
+  state = { ...defaultState, language, brandKit: { ...defaultState.brandKit } };
+  saveState();
+  closeAccountMenu();
+  resetLoginForm();
+  navigate('login');
+  showToast('Demo reset. Start again from the beginning.');
 }
 
 function showGuideChat(question = '') {
@@ -684,6 +713,10 @@ function handleDemoLogin() {
 }
 
 function handleClick(event) {
+  if (accountPopover && !accountPopover.hidden && !event.target.closest('#account-popover') && !event.target.closest('[data-action="account-menu"]')) {
+    closeAccountMenu();
+  }
+
   const routeButton = event.target.closest('[data-route]');
   if (routeButton) {
     navigate(routeButton.dataset.route);
@@ -747,6 +780,18 @@ function handleClick(event) {
     closeRegistrationGuide();
     return;
   }
+  if (action === 'account-menu') {
+    showAccountMenu(actionButton);
+    return;
+  }
+  if (action === 'close-account-menu') {
+    closeAccountMenu();
+    return;
+  }
+  if (action === 'reset-demo') {
+    resetDemo();
+    return;
+  }
   if (action === 'brand-preview') {
     showBrandPreview(actionButton);
     return;
@@ -769,7 +814,6 @@ function handleClick(event) {
     return;
   }
   if (action === 'notifications') showToast('You’re all caught up.');
-  if (action === 'account-menu') showToast('Account menu is mocked for this prototype.');
   if (action === 'forgot-password') showToast('Password reset is mocked for this prototype.');
   if (action === 'terms') showToast('Terms are represented as prototype copy.');
   if (action === 'privacy') showToast('Privacy policy is represented as prototype copy.');
@@ -812,6 +856,7 @@ function handleKeydown(event) {
   if (timelineModal && !timelineModal.hidden) closeApplicationTimeline();
   if (brandModal && !brandModal.hidden) closeBrandPreview();
   if (guideModal && !guideModal.hidden) closeRegistrationGuide();
+  if (accountPopover && !accountPopover.hidden) closeAccountMenu();
 }
 
 document.addEventListener('click', handleClick);

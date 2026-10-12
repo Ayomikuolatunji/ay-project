@@ -1002,6 +1002,30 @@ body.timeline-modal-open { overflow: hidden; }
 
 .guide-item p { max-width: 450px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 
+.account-popover[hidden] { display: none; }
+
+.account-popover { position: fixed; z-index: 60; top: 74px; right: 24px; width: min(320px, calc(100vw - 32px)); }
+
+.account-popover-card { padding: 18px; border: 1px solid rgba(255,255,255,.7); border-radius: 15px; background: var(--paper); box-shadow: 0 18px 48px rgba(11, 28, 26, .18); animation: modal-in 180ms ease both; }
+
+.account-popover-heading { display: flex; align-items: flex-start; gap: 9px; }
+
+.account-popover-heading > div { display: grid; min-width: 0; gap: 1px; }
+
+.account-popover-heading .eyebrow { margin: 0; }
+
+.account-popover-heading strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.account-popover-heading small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+.account-popover-card h2 { margin: 18px 0 6px; font-size: 19px; line-height: 1.1; }
+
+.account-popover-card p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+.account-popover-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 17px; padding-top: 13px; border-top: 1px solid var(--line); }
+
+.account-popover-actions .button { min-height: 37px; padding: 0 11px; font-size: 9px; }
+
 .toast { position: fixed; z-index: 40; right: 22px; bottom: 22px; max-width: min(360px, calc(100vw - 44px)); padding: 11px 14px; transform: translateY(16px); border: 1px solid #315148; border-radius: 8px; background: var(--deep); color: #edf4e9; box-shadow: var(--shadow); font-size: 11px; opacity: 0; pointer-events: none; transition: opacity var(--ease), transform var(--ease); }
 
 .toast.is-visible { transform: translateY(0); opacity: 1; }
@@ -1125,6 +1149,9 @@ body.timeline-modal-open { overflow: hidden; }
   .timeline-current { align-items: flex-start; flex-direction: column; gap: 10px; }
   .timeline-modal-footer { align-items: stretch; flex-direction: column; }
   .timeline-modal-footer .button { width: 100%; }
+  .account-popover { top: 67px; right: 16px; }
+  .account-popover-actions { align-items: stretch; flex-direction: column-reverse; }
+  .account-popover-actions .button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
