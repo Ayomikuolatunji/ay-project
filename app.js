@@ -35,6 +35,31 @@ const toast = document.querySelector('#toast');
 const publicNav = document.querySelector('.public-nav');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const mobileMenu = document.querySelector('[data-mobile-menu]');
+const landingNavLinks = [...document.querySelectorAll('[data-nav-scroll]')];
+
+function setActiveLandingSection(sectionId) {
+  landingNavLinks.forEach((link) => {
+    const isActive = Boolean(sectionId) && link.dataset.scroll === sectionId;
+    link.classList.toggle('is-active', isActive);
+    if (isActive) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+}
+
+function observeLandingSections() {
+  if (!('IntersectionObserver' in window)) return;
+  const sections = ['features', 'how-it-works', 'brand-building']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  const observer = new IntersectionObserver((entries) => {
+    const visibleSection = entries
+      .filter((entry) => entry.isIntersecting)
+      .sort((first, second) => second.intersectionRatio - first.intersectionRatio)[0];
+    if (visibleSection) setActiveLandingSection(visibleSection.target.id);
+  }, { rootMargin: '-18% 0px -62% 0px', threshold: [0, 0.2, 0.6] });
+
+  sections.forEach((section) => observer.observe(section));
+}
 
 function loadState() {
   try {
@@ -88,6 +113,7 @@ function syncLanguageControls() {
 function navigate(route, updateHash = true) {
   const targetRoute = validRoutes.has(route) ? route : 'landing';
   setMobileMenu(false);
+  if (targetRoute === 'landing') setActiveLandingSection(null);
 
   screens.forEach((screen) => {
     const isTarget = screen.dataset.screen === targetRoute;
@@ -308,7 +334,10 @@ function handleClick(event) {
   const scrollButton = event.target.closest('[data-scroll]');
   if (scrollButton) {
     const destination = document.getElementById(scrollButton.dataset.scroll);
-    if (destination) destination.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (destination) {
+      setActiveLandingSection(destination.id);
+      destination.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     setMobileMenu(false);
     return;
   }
@@ -382,4 +411,5 @@ document.addEventListener('change', handleChange);
 window.addEventListener('hashchange', handleHashChange);
 
 const initialRoute = window.location.hash.slice(1);
+observeLandingSections();
 navigate(validRoutes.has(initialRoute) ? initialRoute : 'landing', false);
