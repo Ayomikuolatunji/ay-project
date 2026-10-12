@@ -747,6 +747,12 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .dashboard-progress-track span { display: block; width: 20%; height: 100%; border-radius: inherit; background: var(--lime); }
 
+.timeline-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 16px; padding: 0; background: transparent; color: var(--lime); font-size: 9px; font-weight: 750; }
+
+.timeline-link span { font-size: 12px; }
+
+.timeline-link:hover { color: var(--orange); }
+
 .status-tracker { display: grid; align-content: center; gap: 12px; min-width: 230px; padding-left: 30px; border-left: 1px solid rgba(255,255,255,.13); }
 
 .tracker-step { display: flex; align-items: center; gap: 8px; color: #718b80; font-size: 9px; }
@@ -838,7 +844,7 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .brand-modal[hidden] { display: none; }
 
-.brand-modal { position: fixed; z-index: 35; inset: 0; display: grid; place-items: center; padding: 24px; }
+.brand-modal { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 24px; }
 
 .brand-modal-backdrop { position: absolute; inset: 0; background: rgba(19, 43, 41, .68); backdrop-filter: blur(5px); }
 
@@ -921,6 +927,66 @@ body.brand-modal-open { overflow: hidden; }
 .brand-ready-label i { display: inline-block; width: 5px; height: 5px; margin: 0 4px 1px 0; border-radius: 50%; background: var(--lime-dark); }
 
 .brand-modal-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+.timeline-modal[hidden] { display: none; }
+
+.timeline-modal { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 24px; }
+
+.timeline-modal-backdrop { position: absolute; inset: 0; background: rgba(19, 43, 41, .68); backdrop-filter: blur(5px); }
+
+.timeline-modal-card { position: relative; width: min(720px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; padding: 31px; border: 1px solid rgba(255,255,255,.7); border-radius: 20px; background: var(--paper); box-shadow: 0 26px 80px rgba(11, 28, 26, .28); animation: modal-in 220ms ease both; }
+
+body.timeline-modal-open { overflow: hidden; }
+
+.timeline-modal-close { position: absolute; z-index: 1; top: 18px; right: 18px; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--white); color: var(--ink-soft); font-size: 19px; line-height: 1; }
+
+.timeline-modal-close:hover { border-color: var(--purple); color: var(--purple); }
+
+.timeline-modal-heading { max-width: 550px; margin-bottom: 21px; padding-right: 35px; }
+
+.timeline-modal-heading h2 { margin: 5px 0 8px; font-size: clamp(28px, 4vw, 42px); line-height: 1.04; }
+
+.timeline-modal-heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+.timeline-current { display: flex; align-items: center; justify-content: space-between; gap: 17px; padding: 16px 17px; border-radius: 12px; background: var(--deep); color: #edf4e9; }
+
+.timeline-current .status-pill { flex: 0 0 auto; background: rgba(210,242,107,.12); }
+
+.timeline-current p { max-width: 390px; margin: 0; color: #b7c8bd; font-size: 10px; line-height: 1.5; }
+
+.timeline-list { display: grid; margin-top: 24px; }
+
+.timeline-item { position: relative; display: grid; grid-template-columns: 30px 1fr; gap: 11px; min-height: 68px; padding-bottom: 17px; }
+
+.timeline-item:not(:last-child)::before { position: absolute; top: 30px; bottom: 0; left: 14px; border-left: 1px solid var(--line-strong); content: ''; }
+
+.timeline-marker { position: relative; z-index: 1; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--paper); color: var(--muted); font-size: 9px; font-weight: 750; }
+
+.timeline-item.is-complete .timeline-marker { border-color: var(--lime-dark); background: var(--lime); color: var(--deep); }
+
+.timeline-item.is-current .timeline-marker { border-color: var(--deep); background: var(--deep); color: var(--lime); box-shadow: 0 0 0 4px rgba(19,43,41,.1); }
+
+.timeline-item-copy { padding-top: 2px; }
+
+.timeline-item-copy > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+.timeline-item-copy strong { color: var(--ink-soft); font-size: 11px; }
+
+.timeline-item.is-current .timeline-item-copy strong { color: var(--ink); }
+
+.timeline-item-copy span { color: var(--muted); font-size: 8px; font-weight: 700; }
+
+.timeline-item.is-current .timeline-item-copy span { color: var(--purple); }
+
+.timeline-item-copy p { max-width: 490px; margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+
+.timeline-item.is-upcoming .timeline-item-copy { opacity: .62; }
+
+.timeline-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+.timeline-modal-footer > span { color: var(--muted); font-size: 8px; }
+
+.timeline-modal-footer > span i { display: inline-block; width: 5px; height: 5px; margin: 0 4px 1px 0; border-radius: 50%; background: var(--orange); }
 
 .toast { position: fixed; z-index: 40; right: 22px; bottom: 22px; max-width: min(360px, calc(100vw - 44px)); padding: 11px 14px; transform: translateY(16px); border: 1px solid #315148; border-radius: 8px; background: var(--deep); color: #edf4e9; box-shadow: var(--shadow); font-size: 11px; opacity: 0; pointer-events: none; transition: opacity var(--ease), transform var(--ease); }
 
@@ -1040,6 +1106,11 @@ body.brand-modal-open { overflow: hidden; }
   .brand-deliverables { align-items: flex-start; flex-direction: column; }
   .brand-modal-actions { align-items: stretch; flex-direction: column-reverse; }
   .brand-modal-actions .button { width: 100%; }
+  .timeline-modal { align-items: end; padding: 12px; }
+  .timeline-modal-card { max-height: calc(100vh - 24px); padding: 24px 16px 16px; border-radius: 18px 18px 0 0; }
+  .timeline-current { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .timeline-modal-footer { align-items: stretch; flex-direction: column; }
+  .timeline-modal-footer .button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

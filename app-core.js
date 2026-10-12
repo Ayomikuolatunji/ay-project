@@ -150,6 +150,44 @@ export function getRegistrationProgress(stage = 'data') {
   return progressByStage[stage] ?? progressByStage.data;
 }
 
+const applicationTimeline = [
+  {
+    id: 'data',
+    label: 'Data pending',
+    note: 'Your business details are saved. Next is a document check.',
+  },
+  {
+    id: 'payment',
+    label: 'Payment',
+    note: 'Your documents passed the readiness check. Review the mock filing step next.',
+  },
+  {
+    id: 'verifying',
+    label: 'Verifying',
+    note: 'Your document check is complete and the application is moving through verification.',
+  },
+  {
+    id: 'waiting',
+    label: 'Waiting for CAC',
+    note: 'Verification is complete in this prototype. The next step is waiting for CAC.',
+  },
+  {
+    id: 'registered',
+    label: 'Registered',
+    note: 'The prototype marks this application as registered.',
+  },
+];
+
+export function getApplicationTimeline(stage = 'data') {
+  const normalizedStage = stage === 'documents' ? 'data' : stage;
+  const activeIndex = Math.max(0, applicationTimeline.findIndex((item) => item.id === normalizedStage));
+
+  return applicationTimeline.map((item, index) => ({
+    ...item,
+    status: index < activeIndex ? 'complete' : index === activeIndex ? 'current' : 'upcoming',
+  }));
+}
+
 export function getRegulAIReply(question = '') {
   const normalizedQuestion = String(question ?? '').toLowerCase();
 

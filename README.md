@@ -9,7 +9,7 @@ The product helps a new entrepreneur move from business idea to a clearer regist
 - guided business-name registration flow;
 - mock document quality checks for identity and passport-photo uploads;
 - mock payment and application filing;
-- five-stage application status dashboard;
+- five-stage application status dashboard with a detailed application timeline;
 - language selector for English, Yorùbá, Hausa, and Igbo;
 - interactive starter brand-kit preview personalized with a logo direction, company profile, and landing page concept.
 
@@ -31,4 +31,4 @@ Then open [http://localhost:4173](http://localhost:4173).
 npm test
 ```
 
-The automated tests cover the registration-state helpers. The browser smoke pass covers the landing page, mobile landing page, login validation, registration details, mock document checks, mock payment, dashboard handoff, and brand-kit preview interactions.
+The automated tests cover the registration-state helpers. The browser smoke pass covers the landing page, mobile landing page, login validation, registration details, mock document checks, mock payment, dashboard handoff, brand-kit preview interactions, and application timeline states.

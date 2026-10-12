@@ -1,6 +1,7 @@
 import {
   createBrandKit,
   createRegistrationDraft,
+  getApplicationTimeline,
   getRegistrationProgress,
   getRegulAIReply,
   isValidEmail,
@@ -16,14 +17,6 @@ const registrationSteps = [
   { id: 'documents', label: 'Document check' },
   { id: 'payment', label: 'Payment & filing' },
 ];
-const trackerSteps = [
-  { id: 'data', label: 'Data pending' },
-  { id: 'payment', label: 'Payment' },
-  { id: 'verifying', label: 'Verifying' },
-  { id: 'waiting', label: 'Waiting for CAC' },
-  { id: 'registered', label: 'Registered' },
-];
-
 const defaultState = {
   language: 'en',
   user: null,
@@ -36,10 +29,12 @@ let state = loadState();
 let toastTimeout;
 let brandPreviewTrigger = null;
 let brandPreviewThemeId = 'meadow';
+let timelineTrigger = null;
 
 const screens = [...document.querySelectorAll('[data-screen]')];
 const toast = document.querySelector('#toast');
 const brandModal = document.querySelector('#brand-modal');
+const timelineModal = document.querySelector('#timeline-modal');
 const publicNav = document.querySelector('.public-nav');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const mobileMenu = document.querySelector('[data-mobile-menu]');
@@ -227,6 +222,39 @@ function copyBrandProfile() {
     return;
   }
   showToast('Company profile is ready to copy in this preview.');
+}
+
+function renderApplicationTimeline() {
+  const timeline = getApplicationTimeline(trackerStage(state.draft?.stage || 'data'));
+  const current = timeline.find((item) => item.status === 'current') || timeline[0];
+  const currentLabel = document.querySelector('#timeline-current-label');
+  const currentNote = document.querySelector('#timeline-current-note');
+  const list = document.querySelector('#timeline-list');
+  if (!currentLabel || !currentNote || !list) return;
+
+  currentLabel.textContent = current.label;
+  currentNote.textContent = current.note;
+  list.innerHTML = timeline.map((item, index) => `<div class="timeline-item is-${item.status}">
+    <span class="timeline-marker">${item.status === 'complete' ? '✓' : index + 1}</span>
+    <div class="timeline-item-copy"><div><strong>${escapeHtml(item.label)}</strong><span>${item.status === 'current' ? 'Current stage' : item.status === 'complete' ? 'Complete' : 'Up next'}</span></div><p>${escapeHtml(item.note)}</p></div>
+  </div>`).join('');
+}
+
+function showApplicationTimeline(trigger = null) {
+  if (!timelineModal) return;
+  timelineTrigger = trigger;
+  renderApplicationTimeline();
+  timelineModal.hidden = false;
+  document.body.classList.add('timeline-modal-open');
+  timelineModal.querySelector('.timeline-modal-close')?.focus();
+}
+
+function closeApplicationTimeline() {
+  if (!timelineModal || timelineModal.hidden) return;
+  timelineModal.hidden = true;
+  document.body.classList.remove('timeline-modal-open');
+  timelineTrigger?.focus();
+  timelineTrigger = null;
 }
 
 function showGuideChat(question = '') {
@@ -455,7 +483,7 @@ function renderDashboard() {
   const draft = state.draft;
   const displayName = draft?.businessName || 'No registration started';
   const stage = trackerStage(draft?.stage || 'data');
-  const currentIndex = trackerSteps.findIndex((item) => item.id === stage);
+  const timeline = getApplicationTimeline(stage);
   const progress = draft ? getRegistrationProgress(draft.stage) : 0;
   const userName = state.user?.name || 'Ayo Olatunji';
 
@@ -466,9 +494,9 @@ function renderDashboard() {
   document.querySelector('#dashboard-registration-type').textContent = `${draft?.businessType || 'Business Name'} registration · Started today`;
   document.querySelector('#dashboard-progress-number').textContent = `${progress}%`;
   document.querySelector('#dashboard-progress-bar').style.width = `${progress}%`;
-  document.querySelector('#status-tracker').innerHTML = trackerSteps.map((item, index) => {
-    const done = index < currentIndex;
-    const active = index === currentIndex;
+  document.querySelector('#status-tracker').innerHTML = timeline.map((item, index) => {
+    const done = item.status === 'complete';
+    const active = item.status === 'current';
     return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span>${item.label}</span></div>`;
   }).join('');
   renderDashboardBrandKit();
@@ -635,6 +663,14 @@ function handleClick(event) {
   if (action === 'sign-out') handleSignOut();
   if (action === 'toggle-password') togglePasswordVisibility();
   if (action === 'open-chat') showGuideChat(actionButton.dataset.chatQuestion || '');
+  if (action === 'open-timeline') {
+    showApplicationTimeline(actionButton);
+    return;
+  }
+  if (action === 'close-timeline') {
+    closeApplicationTimeline();
+    return;
+  }
   if (action === 'brand-preview') {
     showBrandPreview(actionButton);
     return;
@@ -693,7 +729,9 @@ function handleHashChange() {
 }
 
 function handleKeydown(event) {
-  if (event.key === 'Escape' && brandModal && !brandModal.hidden) closeBrandPreview();
+  if (event.key !== 'Escape') return;
+  if (timelineModal && !timelineModal.hidden) closeApplicationTimeline();
+  if (brandModal && !brandModal.hidden) closeBrandPreview();
 }
 
 document.addEventListener('click', handleClick);

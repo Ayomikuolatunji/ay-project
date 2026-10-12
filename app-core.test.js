@@ -5,6 +5,7 @@ import {
   createRegistrationDraft,
   createBrandKit,
   getRegistrationProgress,
+  getApplicationTimeline,
   getRegulAIReply,
   validateDocumentFile,
   isValidEmail,
@@ -54,6 +55,21 @@ test('reports the guided registration progress by stage', () => {
   assert.equal(getRegistrationProgress('documents'), 50);
   assert.equal(getRegistrationProgress('payment'), 75);
   assert.equal(getRegistrationProgress('registered'), 100);
+});
+
+test('derives the application timeline state from the current stage', () => {
+  const timeline = getApplicationTimeline('verifying');
+
+  assert.deepEqual(timeline.map((item) => [item.id, item.status]), [
+    ['data', 'complete'],
+    ['payment', 'complete'],
+    ['verifying', 'current'],
+    ['waiting', 'upcoming'],
+    ['registered', 'upcoming'],
+  ]);
+  assert.equal(timeline[2].label, 'Verifying');
+  assert.match(timeline[2].note, /document check/i);
+  assert.equal(getApplicationTimeline('unknown')[0].status, 'current');
 });
 
 test('returns grounded guidance for the dashboard assistant topics', () => {
