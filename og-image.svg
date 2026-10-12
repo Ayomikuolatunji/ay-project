@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">RegulAI — Register the business. Build the brand.</title>
+  <desc id="description">A clearer path from business idea to Nigerian business registration and a starter brand kit.</desc>
+  <rect width="1200" height="630" fill="#f4f5ef" />
+  <rect x="720" width="480" height="630" fill="#132b29" />
+  <circle cx="1108" cy="82" r="122" fill="#1c3c37" />
+  <circle cx="1090" cy="562" r="176" fill="#193530" />
+  <path d="M720 0h-54c56 110 82 213 82 315s-26 205-82 315h54c51-99 76-204 76-315S771 99 720 0Z" fill="#e7ecdf" opacity=".58" />
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="72" y="64" width="48" height="48" rx="14" fill="#d2f26b" />
+    <text x="96" y="99" text-anchor="middle" font-family="Georgia, serif" font-size="28" font-weight="700" fill="#132b29">R</text>
+    <circle cx="108" cy="97" r="4" fill="#f18e66" />
+    <text x="137" y="87" font-size="21" font-weight="700" letter-spacing="-0.8" fill="#132b29">RegulAI</text>
+    <text x="137" y="105" font-size="11" fill="#6c8178">business, made official</text>
+
+    <rect x="72" y="165" width="36" height="3" rx="1.5" fill="#f18e66" />
+    <text x="120" y="170" font-size="13" font-weight="700" fill="#61766e">Built for Nigeria's next businesses</text>
+
+    <text x="72" y="250" font-family="Georgia, serif" font-size="58" letter-spacing="-2.4" fill="#132b29">Register the</text>
+    <text x="72" y="316" font-family="Georgia, serif" font-size="58" letter-spacing="-2.4" fill="#132b29">business.</text>
+    <text x="72" y="382" font-family="Georgia, serif" font-size="58" font-style="italic" letter-spacing="-2.4" fill="#132b29">Build the brand.</text>
+
+    <text x="74" y="432" font-size="17" fill="#5f736a">A guided first mile for entrepreneurs</text>
+    <text x="74" y="456" font-size="17" fill="#5f736a">turning a business idea into a clearer next step.</text>
+
+    <g font-size="12" font-weight="700">
+      <rect x="72" y="510" width="150" height="34" rx="17" fill="#132b29" />
+      <text x="147" y="532" text-anchor="middle" fill="#d2f26b">Registration guidance</text>
+      <rect x="234" y="510" width="130" height="34" rx="17" fill="#e8efe1" stroke="#d5ddd2" />
+      <text x="299" y="532" text-anchor="middle" fill="#315148">Document checks</text>
+      <rect x="376" y="510" width="123" height="34" rx="17" fill="#f8e1d6" />
+      <text x="437" y="532" text-anchor="middle" fill="#884e3c">Starter brand kit</text>
+    </g>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="774" y="82" font-size="13" font-weight="700" fill="#d2f26b">RegulAI guide</text>
+    <text x="1128" y="82" text-anchor="end" font-size="12" fill="#9eb1a5">Usually replies instantly</text>
+    <circle cx="1018" cy="114" r="5" fill="#d2f26b" />
+    <text x="1032" y="119" font-size="12" fill="#d2f26b">Secure session</text>
+
+    <rect x="774" y="156" width="354" height="150" rx="18" fill="#f4f5ef" />
+    <circle cx="812" cy="195" r="19" fill="#d2f26b" />
+    <text x="812" y="202" text-anchor="middle" font-family="Georgia, serif" font-size="19" font-weight="700" fill="#132b29">R</text>
+    <text x="846" y="191" font-size="13" font-weight="700" fill="#132b29">Let's make it official.</text>
+    <text x="846" y="212" font-size="12" fill="#6c8178">Your next step is clear.</text>
+    <rect x="800" y="239" width="282" height="42" rx="12" fill="#e7ecdf" />
+    <text x="821" y="264" font-size="12" fill="#496158">Tell us about your business...</text>
+    <circle cx="1055" cy="260" r="15" fill="#132b29" />
+    <text x="1055" y="265" text-anchor="middle" font-size="16" font-weight="700" fill="#d2f26b">↑</text>
+
+    <rect x="774" y="340" width="354" height="184" rx="18" fill="#1c3c37" stroke="#3b5a50" />
+    <text x="800" y="374" font-size="12" fill="#9eb1a5">Registration progress</text>
+    <text x="1100" y="374" text-anchor="end" font-size="13" font-weight="700" fill="#d2f26b">1 of 5</text>
+    <rect x="800" y="394" width="302" height="8" rx="4" fill="#315148" />
+    <rect x="800" y="394" width="61" height="8" rx="4" fill="#d2f26b" />
+    <circle cx="806" cy="445" r="8" fill="#d2f26b" />
+    <text x="824" y="450" font-size="14" font-weight="700" fill="#edf4e9">Business details</text>
+    <path d="M806 468v25" stroke="#5d7a6d" stroke-width="2" />
+    <circle cx="806" cy="512" r="8" fill="#f18e66" />
+    <text x="824" y="517" font-size="14" fill="#b9c8bc">Documents next</text>
+    <text x="1100" y="568" text-anchor="end" font-family="Georgia, serif" font-size="17" font-style="italic" fill="#d2f26b">From idea to official</text>
+  </g>
+</svg>
