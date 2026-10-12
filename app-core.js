@@ -6,6 +6,46 @@ export function isValidEmail(value = '') {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+const demoBusinessNames = {
+  'dangote ventures': {
+    status: 'unavailable',
+    message: 'This demo name is already registered. Try one of the suggested alternatives.',
+    suggestions: ['Dangoti Ventures', 'Dangote Reach Ventures'],
+  },
+  'zenith traders': {
+    status: 'unavailable',
+    message: 'This demo name is already registered. Try one of the suggested alternatives.',
+    suggestions: ['Zenith Trade Hub', 'Zenith Point Traders'],
+  },
+  'first bank supplies': {
+    status: 'restricted',
+    message: 'This demo name contains a restricted word and needs a different direction.',
+    suggestions: ['Prime Bank-Street Supplies', 'First Choice Supplies'],
+  },
+};
+
+export function checkBusinessNameAvailability(value = '') {
+  const name = normalizeBusinessName(value);
+  if (!name) {
+    return {
+      status: 'empty',
+      name,
+      message: 'Enter a business name to check availability.',
+      suggestions: [],
+    };
+  }
+
+  const knownResult = demoBusinessNames[name.toLowerCase()];
+  if (knownResult) return { ...knownResult, name };
+
+  return {
+    status: 'available',
+    name,
+    message: 'No conflict found in this demo checker. The name is available to continue.',
+    suggestions: [],
+  };
+}
+
 const localizedCopy = {
   en: {
     dashboard: {
@@ -44,6 +84,75 @@ const localizedCopy = {
       current: 'Current stage',
       complete: 'Complete',
       upcoming: 'Up next',
+    },
+    registration: {
+      data: {
+        eyebrow: 'Step 1 of 3 · Business details',
+        heading: 'Tell us about the business you’re building.',
+        intro: 'You don’t need to know the official language. Start with the idea in your own words and we’ll help shape the application.',
+        guide: 'Welcome. What kind of business are you bringing to life?',
+        nameLabel: 'Business name or idea',
+        namePlaceholder: 'e.g. Ayo’s Table',
+        typeLabel: 'Business type',
+        inspiration: 'Need inspiration?',
+        descriptionLabel: 'What does the business do?',
+        descriptionPlaceholder: 'Tell us what you sell, make, or help people do.',
+        servicesLabel: 'Products or services (comma-separated)',
+        servicesPlaceholder: 'e.g. Natural skincare, wellness consultation',
+        emailLabel: 'Business email (optional)',
+        phoneLabel: 'Phone number (optional)',
+        contactHint: 'Used to personalize your starter brand assets.',
+        checkName: 'Check availability',
+        checkPrompt: 'Check the demo name checker before continuing.',
+        continue: 'Continue to documents',
+        note: 'You can change these details later.',
+        items: [
+          { title: 'Name or idea', body: 'Use the name you are considering, even if it is not final yet.' },
+          { title: 'Business type', body: 'Choose the structure that best matches how you plan to operate.' },
+          { title: 'Plain-language description', body: 'Explain what you sell, make, or help people do.' },
+        ],
+      },
+      documents: {
+        eyebrow: 'Step 2 of 3 · Document check',
+        heading: 'Let’s make sure your documents are ready.',
+        intro: 'Upload clear copies of the documents needed for your Business Name application. This demo checks format, readability, and sample OCR fields before the next step.',
+        guide: 'A clear document now means less back-and-forth later. Choose a file or use a demo file for this prototype.',
+        identityTitle: 'Government-issued identity document',
+        identityDescription: 'National ID, driver’s licence, or international passport',
+        passportTitle: 'Passport photograph',
+        passportDescription: 'A recent, clear photo with a plain background',
+        ready: 'Ready',
+        flagged: 'Review needed',
+        pending: 'Pending',
+        choose: 'Choose file',
+        replace: 'Replace file',
+        demo: 'Use demo file',
+        back: 'Back',
+        continue: 'Review application',
+        note: 'Keep each file clear and under 5 MB for this prototype.',
+        items: [
+          { title: 'Identity document', body: 'Prepare a government-issued identity document such as a National ID, driver’s licence, or passport.' },
+          { title: 'Passport photograph', body: 'Use a recent JPG or PNG photo with a plain background.' },
+          { title: 'One file at a time', body: 'Choose a file or use a demo file, then wait for the Ready status before reviewing.' },
+        ],
+      },
+      payment: {
+        eyebrow: 'Step 3 of 3 · Payment & filing',
+        heading: 'Your application is ready to move.',
+        intro: 'Review the details below. In the full system this step connects to a sandbox payment flow before the application enters verification.',
+        guide: 'Everything looks ready. Once payment is confirmed, your application moves to the verification queue.',
+        fee: 'Mock filing fee',
+        sandbox: 'Government charges included · Sandbox payment',
+        back: 'Back',
+        retry: 'Simulate failed payment',
+        submit: 'Pay & queue application',
+        note: 'You can return to earlier steps before submitting the mock application.',
+        items: [
+          { title: 'Review your details', body: 'Make sure the business name, type, and description say what you mean.' },
+          { title: 'Sandbox payment', body: 'This demo shows a ₦25,000 filing fee. No real payment is taken.' },
+          { title: 'Track what happens next', body: 'After submission, your dashboard shows verification, CAC waiting, and registration stages.' },
+        ],
+      },
     },
   },
   yo: {
@@ -84,6 +193,75 @@ const localizedCopy = {
       complete: 'Ti parí',
       upcoming: 'Ohun tó ń bọ̀',
     },
+    registration: {
+      data: {
+        eyebrow: 'Igbesẹ 1 ninu 3 · Àlàyé iṣẹ́',
+        heading: 'Sọ fún wa nípa iṣẹ́ tí o ń kọ́.',
+        intro: 'Bẹ̀rẹ̀ pẹ̀lú èrò rẹ ní àwọn ọ̀rọ̀ tirẹ; a ó ràn ọ́ lọ́wọ́ láti ṣètò ìforúkọsílẹ̀.',
+        guide: 'Kí ni irú iṣẹ́ tí o fẹ́ bẹ̀rẹ̀?',
+        nameLabel: 'Orúkọ iṣẹ́ tàbí èrò',
+        namePlaceholder: 'àpẹẹrẹ Ayo’s Table',
+        typeLabel: 'Irú ìforúkọsílẹ̀',
+        inspiration: 'Ṣé o nílò àbá?',
+        descriptionLabel: 'Kí ni iṣẹ́ náà ń ṣe?',
+        descriptionPlaceholder: 'Sọ ohun tí o ń tà, ṣe, tàbí ran ènìyàn lọ́wọ́.',
+        servicesLabel: 'Ọjà tàbí iṣẹ́ (pínyà pẹ̀lú koma)',
+        servicesPlaceholder: 'àpẹẹrẹ itọju awọ, ìmọ̀ràn ìlera',
+        emailLabel: 'Ímeèlì iṣẹ́ (àṣàyàn)',
+        phoneLabel: 'Nọ́mbà fóònù (àṣàyàn)',
+        contactHint: 'A ó lò ó láti ṣe àdáni àwọn ohun àmì rẹ.',
+        checkName: 'Ṣàyẹ̀wò àyè orúkọ',
+        checkPrompt: 'Ṣàyẹ̀wò orúkọ nínú àyẹ̀wò àpẹẹrẹ kí o tó tẹ̀síwájú.',
+        continue: 'Tẹ̀síwájú sí àwọn ìwé',
+        note: 'O lè yí àwọn àlàyé wọ̀nyí padà lẹ́yìn náà.',
+        items: [
+          { title: 'Orúkọ tàbí èrò', body: 'Lo orúkọ tí o ń ronú sí, bó tilẹ̀ jẹ́ pé kò tíì péye.' },
+          { title: 'Irú iṣẹ́', body: 'Yan irú tó bá bí o ṣe fẹ́ ṣiṣẹ́ mu jù.' },
+          { title: 'Àlàyé ní èdè rọrùn', body: 'Ṣàlàyé ohun tí o ń tà, ṣe, tàbí ran ènìyàn lọ́wọ́.' },
+        ],
+      },
+      documents: {
+        eyebrow: 'Igbesẹ 2 ninu 3 · Àyẹ̀wò ìwé',
+        heading: 'Jẹ́ ká rí i pé àwọn ìwé rẹ ti ṣetán.',
+        intro: 'Gbé àwọn ẹ̀dà tó mọ́kàn àwọn ìwé tí a nílò sókè. Àpẹẹrẹ yìí máa ṣàyẹ̀wò irú fáìlì, kíkà, àti OCR.',
+        guide: 'Ìwé tó mọ́kàn máa dín ìdádúró kù. Yan fáìlì tàbí lo fáìlì àpẹẹrẹ.',
+        identityTitle: 'Ìwé ìdánimọ̀ tí ìjọba fún',
+        identityDescription: 'NIN, ìwé awakọ̀, tàbí passport',
+        passportTitle: 'Fọ́tò passport',
+        passportDescription: 'Fọ́tò tuntun tó mọ́kàn pẹ̀lú abẹ́lẹ̀ pẹ̀tẹ́lẹ̀',
+        ready: 'Ṣetán',
+        flagged: 'Nílò àyẹ̀wò',
+        pending: 'Ń dúró',
+        choose: 'Yan fáìlì',
+        replace: 'Rọ́pò fáìlì',
+        demo: 'Lo fáìlì àpẹẹrẹ',
+        back: 'Padà',
+        continue: 'Ṣàyẹ̀wò ìforúkọsílẹ̀',
+        note: 'Jẹ́ kí fáìlì kọọkan mọ́kàn, kó sì kéré sí 5 MB nínú àpẹẹrẹ yìí.',
+        items: [
+          { title: 'Ìwé ìdánimọ̀ tí ìjọba fún', body: 'Pèsè ìwé ìdánimọ̀ tí ìjọba fún bí NIN, ìwé awakọ̀, tàbí passport.' },
+          { title: 'Fọ́tò passport', body: 'Lo fọ́tò JPG tàbí PNG tuntun tó mọ́kàn pẹ̀lú abẹ́lẹ̀ pẹ̀tẹ́lẹ̀.' },
+          { title: 'Fáìlì kan lẹ́ẹ̀kan', body: 'Yan fáìlì tàbí lo fáìlì àpẹẹrẹ, kí o dúró de àmì Ṣetán.' },
+        ],
+      },
+      payment: {
+        eyebrow: 'Igbesẹ 3 ninu 3 · Ìsanwó àti fífilẹ̀',
+        heading: 'Ìforúkọsílẹ̀ rẹ ti ṣetán láti tẹ̀síwájú.',
+        intro: 'Ṣàyẹ̀wò àwọn àlàyé. Nínú ètò kíkún, ìgbésẹ̀ yìí máa lo sandbox payment kí ìforúkọsílẹ̀ tó wọ̀ verification.',
+        guide: 'Ohun gbogbo dára. Lẹ́yìn ìsanwó, ìforúkọsílẹ̀ rẹ máa wọ̀ àyẹ̀wò.',
+        fee: 'Owó fífilẹ̀ àpẹẹrẹ',
+        sandbox: 'Owó ìjọba wà nínú rẹ̀ · Sandbox payment',
+        back: 'Padà',
+        retry: 'Ṣàpẹẹrẹ ìsanwó tí kò ṣeé ṣe',
+        submit: 'Sanwó kí o sì fi ìforúkọsílẹ̀ sí ìlà',
+        note: 'O lè padà sí àwọn ìgbésẹ̀ àtẹ́lẹwọ́ kí o tó fi àpẹẹrẹ náà sílẹ̀.',
+        items: [
+          { title: 'Ṣàyẹ̀wò àlàyé rẹ', body: 'Rí i pé orúkọ, irú iṣẹ́, àti àlàyé sọ ohun tí o fẹ́ gan-an.' },
+          { title: 'Ìsanwó sandbox', body: 'Àpẹẹrẹ yìí fi owó fífilẹ̀ ₦25,000 hàn. A kò gba owó gidi.' },
+          { title: 'Tọ́pinpin ohun tó ń bọ̀', body: 'Lẹ́yìn fífilẹ̀, dashboard máa fi verification, dídúró de CAC, àti ìforúkọsílẹ̀ hàn.' },
+        ],
+      },
+    },
   },
   ha: {
     dashboard: {
@@ -123,6 +301,75 @@ const localizedCopy = {
       complete: 'An kammala',
       upcoming: 'Na gaba',
     },
+    registration: {
+      data: {
+        eyebrow: 'Mataki na 1 cikin 3 · Bayanan kasuwanci',
+        heading: 'Faɗa mana game da kasuwancin da kuke ginawa.',
+        intro: 'Fara da ra’ayin ku cikin kalmominku; za mu taimaka wajen tsara rajistar.',
+        guide: 'Wane irin kasuwanci kuke son farawa?',
+        nameLabel: 'Sunan kasuwanci ko ra’ayi',
+        namePlaceholder: 'misali Ayo’s Table',
+        typeLabel: 'Nau’in rajista',
+        inspiration: 'Kuna bukatar shawara?',
+        descriptionLabel: 'Me kasuwancin yake yi?',
+        descriptionPlaceholder: 'Faɗi abin da kuke sayarwa, kerawa, ko taimakawa mutane da shi.',
+        servicesLabel: 'Kayayyaki ko ayyuka (raba da waƙafi)',
+        servicesPlaceholder: 'misali kula da fata, shawarwarin lafiya',
+        emailLabel: 'Imel ɗin kasuwanci (zaɓi ne)',
+        phoneLabel: 'Lambar waya (zaɓi ne)',
+        contactHint: 'Za a yi amfani da su wajen tsara kayan alamar ku.',
+        checkName: 'Duba samuwar suna',
+        checkPrompt: 'Duba sunan a cikin gwajin kafin ci gaba.',
+        continue: 'Ci gaba zuwa takardu',
+        note: 'Kuna iya canza waɗannan bayanan daga baya.',
+        items: [
+          { title: 'Suna ko ra’ayi', body: 'Yi amfani da sunan da kuke tunani, ko da bai zama na ƙarshe ba.' },
+          { title: 'Nau’in kasuwanci', body: 'Zaɓi tsarin da ya fi dacewa da yadda kuke son gudanarwa.' },
+          { title: 'Bayani mai sauƙi', body: 'Bayyana abin da kuke sayarwa, kerawa, ko taimaka wa mutane da shi.' },
+        ],
+      },
+      documents: {
+        eyebrow: 'Mataki na 2 cikin 3 · Duba takardu',
+        heading: 'Mu tabbatar takardunku sun shirya.',
+        intro: 'Loda kwafe masu kyau na takardun rajista. Wannan gwaji yana duba tsari, karantawa, da samfurin OCR.',
+        guide: 'Takarda mai kyau tana rage jinkiri. Zaɓi fayil ko yi amfani da samfurin.',
+        identityTitle: 'Takardar shaidar da gwamnati ta bayar',
+        identityDescription: 'NIN, lasisin tuƙi, ko fasfo',
+        passportTitle: 'Hoton fasfo',
+        passportDescription: 'Hoto na baya-bayan nan mai haske da bango mara cunkoso',
+        ready: 'A shirye',
+        flagged: 'Ana bukatar dubawa',
+        pending: 'Ana jira',
+        choose: 'Zaɓi fayil',
+        replace: 'Sauya fayil',
+        demo: 'Yi amfani da samfurin',
+        back: 'Koma',
+        continue: 'Duba rajista',
+        note: 'A kiyaye kowane fayil ya kasance mai kyau kuma bai wuce 5 MB ba a wannan demo.',
+        items: [
+          { title: 'Takardar shaida', body: 'Shirya takardar da gwamnati ta bayar kamar NIN, lasisin tuƙi, ko fasfo.' },
+          { title: 'Hoton fasfo', body: 'Yi amfani da sabon JPG ko PNG mai haske da bango mara cunkoso.' },
+          { title: 'Fayil ɗaya a lokaci guda', body: 'Zaɓi fayil ko yi amfani da samfurin, sannan jira alamar A shirye.' },
+        ],
+      },
+      payment: {
+        eyebrow: 'Mataki na 3 cikin 3 · Biyan kuɗi da shigarwa',
+        heading: 'A shirye rajistarku take ta ci gaba.',
+        intro: 'Duba bayanan da ke ƙasa. A cikin cikakken tsari, wannan mataki yana amfani da sandbox kafin tantancewa.',
+        guide: 'Komai ya shirya. Bayan an tabbatar da biyan kuɗi, aikace-aikacen zai shiga tantancewa.',
+        fee: 'Kuɗin shigarwa na gwaji',
+        sandbox: 'Kuɗin gwamnati na ciki · Sandbox payment',
+        back: 'Koma',
+        retry: 'Yi samfurin biyan da ya gaza',
+        submit: 'Biya kuma saka aikace-aikacen',
+        note: 'Kuna iya komawa matakan baya kafin aikawa da wannan demo.',
+        items: [
+          { title: 'Duba bayananku', body: 'Tabbatar sunan, nau’in kasuwanci, da bayanin sun bayyana abin da kuke nufi.' },
+          { title: 'Biyan sandbox', body: 'Wannan demo yana nuna kuɗin shigarwa ₦25,000. Ba a karɓi kuɗi na gaske ba.' },
+          { title: 'Bibiyi abin da zai biyo baya', body: 'Bayan aikawa, dashboard yana nuna tantancewa, jiran CAC, da rajista.' },
+        ],
+      },
+    },
   },
   ig: {
     dashboard: {
@@ -161,6 +408,75 @@ const localizedCopy = {
       current: 'Ọkwa ugbu a',
       complete: 'Emechala',
       upcoming: 'Na-abịa',
+    },
+    registration: {
+      data: {
+        eyebrow: 'Nzọụkwụ 1 n’ime 3 · Nkọwa azụmahịa',
+        heading: 'Gwa anyị banyere azụmahịa ị na-ewu.',
+        intro: 'Malite n’echiche gị n’okwu nke gị; anyị ga-enyere aka hazie ndebanye aha.',
+        guide: 'Kedu ụdị azụmahịa ị chọrọ ịmalite?',
+        nameLabel: 'Aha azụmahịa ma ọ bụ echiche',
+        namePlaceholder: 'dịka Ayo’s Table',
+        typeLabel: 'Ụdị ndebanye aha',
+        inspiration: 'Ị chọrọ echiche?',
+        descriptionLabel: 'Kedu ihe azụmahịa ahụ na-eme?',
+        descriptionPlaceholder: 'Gwa anyị ihe ị na-ere, na-emepụta, ma ọ bụ na-enyere ndị mmadụ aka ime.',
+        servicesLabel: 'Ngwaahịa ma ọ bụ ọrụ (kewaa na rikoma)',
+        servicesPlaceholder: 'dịka nlekọta akpụkpọ ahụ, ndụmọdụ ahụike',
+        emailLabel: 'Email azụmahịa (nhọrọ)',
+        phoneLabel: 'Nọmba ekwentị (nhọrọ)',
+        contactHint: 'A ga-eji ha hazie ihe nkwado akara gị.',
+        checkName: 'Lelee nnweta aha',
+        checkPrompt: 'Lelee aha n’ime nnwale tupu ịga n’ihu.',
+        continue: 'Gaa n’ihu na akwụkwọ',
+        note: 'Ị nwere ike ịgbanwe nkọwa ndị a ma emechaa.',
+        items: [
+          { title: 'Aha ma ọ bụ echiche', body: 'Jiri aha ị na-atụle, ọbụna ma ọ bụrụ na ọ bụghị nke ikpeazụ.' },
+          { title: 'Ụdị azụmahịa', body: 'Họrọ usoro dabara nke ọma n’otú ị chọrọ isi rụọ ọrụ.' },
+          { title: 'Nkọwa dị mfe', body: 'Kọwaa ihe ị na-ere, na-emepụta, ma ọ bụ na-enyere ndị mmadụ aka.' },
+        ],
+      },
+      documents: {
+        eyebrow: 'Nzọụkwụ 2 n’ime 3 · Nyocha akwụkwọ',
+        heading: 'Ka anyị hụ na akwụkwọ gị dị njikere.',
+        intro: 'Bulite akwụkwọ ndị doro anya. Nnwale a na-enyocha ụdị faịlụ, ịdị ọcha, na OCR atụ.',
+        guide: 'Akwụkwọ doro anya na-ebelata igbu oge. Họrọ faịlụ ma ọ bụ jiri faịlụ atụ.',
+        identityTitle: 'Akwụkwọ njirimara gọọmentị nyere',
+        identityDescription: 'NIN, akwụkwọ ikike ịnya ụgbọ, ma ọ bụ paspọtụ',
+        passportTitle: 'Foto paspọtụ',
+        passportDescription: 'Foto ọhụrụ doro anya nke nwere ndabere dị larịị',
+        ready: 'Njikere',
+        flagged: 'Achọrọ nyocha',
+        pending: 'Na-eche',
+        choose: 'Họrọ faịlụ',
+        replace: 'Dochie faịlụ',
+        demo: 'Jiri faịlụ atụ',
+        back: 'Laghachi',
+        continue: 'Nyochaa ndebanye aha',
+        note: 'Debe faịlụ ọ bụla doro anya ma ghara ịgafe 5 MB n’ime ihe atụ a.',
+        items: [
+          { title: 'Akwụkwọ njirimara', body: 'Kwadebe akwụkwọ gọọmentị nyere dịka NIN, akwụkwọ ikike ịnya ụgbọ, ma ọ bụ paspọtụ.' },
+          { title: 'Foto paspọtụ', body: 'Jiri foto JPG ma ọ bụ PNG ọhụrụ doro anya nke nwere ndabere dị larịị.' },
+          { title: 'Otu faịlụ n’otu oge', body: 'Họrọ faịlụ ma ọ bụ jiri faịlụ atụ, chere ruo mgbe ọ ga-egosi Njikere.' },
+        ],
+      },
+      payment: {
+        eyebrow: 'Nzọụkwụ 3 n’ime 3 · Ịkwụ ụgwọ na ntinye',
+        heading: 'Ndebanye aha gị dị njikere ịga n’ihu.',
+        intro: 'Nyochaa nkọwa dị n’okpuru. N’usoro zuru ezu, nzọụkwụ a na-eji sandbox tupu nyocha.',
+        guide: 'Ihe niile dị mma. Mgbe akwụchara ụgwọ, ngwa gị ga-abanye na nyocha.',
+        fee: 'Ụgwọ ntinye nnwale',
+        sandbox: 'Ụgwọ gọọmentị gụnyere · Sandbox payment',
+        back: 'Laghachi',
+        retry: 'Nwalee ịkwụ ụgwọ dara',
+        submit: 'Kwụọ ma tinye ngwa',
+        note: 'Ị nwere ike ịlaghachi na nzọụkwụ gara aga tupu itinye ngwa atụ a.',
+        items: [
+          { title: 'Nyochaa nkọwa gị', body: 'Jide n’aka na aha, ụdị azụmahịa, na nkọwa na-ekwu ihe ị chọrọ.' },
+          { title: 'Ịkwụ ụgwọ sandbox', body: 'Ihe atụ a na-egosi ụgwọ ntinye ₦25,000. A naghị ewere ezigbo ego.' },
+          { title: 'Soro ihe na-abịa', body: 'Mgbe i tinyere ya, dashboard na-egosi nyocha, ichere CAC, na ndebanye aha.' },
+        ],
+      },
     },
   },
 };
@@ -222,10 +538,59 @@ export function createBrandKit({ businessName = '', description = '', themeId = 
   };
 }
 
+function normalizeServiceList(value = '') {
+  return String(value ?? '')
+    .split(',')
+    .map((service) => normalizeBusinessName(service))
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+export function createBrandAssets({
+  businessName = '',
+  description = '',
+  serviceList = '',
+  contactEmail = '',
+  contactPhone = '',
+  registrationNumber = '',
+  themeId = 'meadow',
+} = {}) {
+  const brand = createBrandKit({ businessName, description, themeId });
+  const about = normalizeBusinessName(description) || `${brand.businessName} is building a clearer way to serve its customers.`;
+  const services = normalizeServiceList(serviceList);
+  const fallbackServices = services.length > 0 ? services : ['Products and services', 'Customer support', 'Local delivery'];
+  const profile = {
+    businessName: brand.businessName,
+    registrationNumber: normalizeBusinessName(registrationNumber) || 'BN-XXXXXXX (demo)',
+    about,
+    services: fallbackServices,
+    contactEmail: normalizeBusinessName(contactEmail) || 'hello@yourbusiness.example',
+    contactPhone: normalizeBusinessName(contactPhone) || '+234 800 000 0000',
+    theme: brand.theme,
+  };
+
+  return {
+    brand,
+    profile,
+    landing: {
+      businessName: profile.businessName,
+      tagline: brand.descriptor,
+      about: profile.about,
+      services: profile.services,
+      contactEmail: profile.contactEmail,
+      contactPhone: profile.contactPhone,
+      theme: profile.theme,
+    },
+  };
+}
+
 export function createRegistrationDraft({
   businessName = '',
   businessType = 'Business Name',
   description = '',
+  serviceList = '',
+  contactEmail = '',
+  contactPhone = '',
   language = 'en',
 } = {}) {
   return {
@@ -233,6 +598,9 @@ export function createRegistrationDraft({
     businessName: normalizeBusinessName(businessName),
     businessType: normalizeBusinessName(businessType) || 'Business Name',
     description: normalizeBusinessName(description),
+    serviceList: normalizeBusinessName(serviceList),
+    contactEmail: normalizeBusinessName(contactEmail),
+    contactPhone: normalizeBusinessName(contactPhone),
     language,
     stage: 'data',
     documents: {
@@ -247,10 +615,16 @@ export function createRegistrationDraft({
       identity: '',
       passport: '',
     },
+    documentResults: {
+      identity: null,
+      passport: null,
+    },
+    nameCheck: null,
     brandKit: {
       themeId: 'meadow',
     },
     payment: 'pending',
+    paymentError: '',
   };
 }
 
@@ -286,6 +660,52 @@ export function validateDocumentFile({
   return { valid: true, message: 'File looks ready.' };
 }
 
+export function verifyDocumentReadiness({
+  documentType = 'identity',
+  name = '',
+  mimeType = '',
+  size = 0,
+} = {}) {
+  const fileCheck = validateDocumentFile({ documentType, name, mimeType, size });
+  if (!fileCheck.valid) {
+    return {
+      status: 'flagged',
+      confidence: 0,
+      extractedFields: {},
+      message: fileCheck.message,
+    };
+  }
+
+  const normalizedName = String(name).toLowerCase();
+  if (/(blurry|blur|low[- ]?res|cropped|dark|unclear)/.test(normalizedName)) {
+    return {
+      status: 'flagged',
+      confidence: 0.42,
+      extractedFields: {},
+      message: 'The demo OCR check could not read this clearly. Re-upload a brighter, uncropped file.',
+    };
+  }
+
+  if (documentType === 'passport') {
+    return {
+      status: 'passed',
+      confidence: 0.94,
+      extractedFields: { photoQuality: 'Clear passport photograph' },
+      message: 'Photo quality check passed. The image is clear enough for the next step.',
+    };
+  }
+
+  return {
+    status: 'passed',
+    confidence: 0.96,
+    extractedFields: {
+      fullName: 'Ayo Olatunji',
+      documentNumber: '•••• 4821',
+    },
+    message: 'Demo OCR check passed. Key identity fields look complete.',
+  };
+}
+
 export function validateRegistrationDetails({ businessName = '', businessType = '' } = {}) {
   const errors = {};
   const validBusinessTypes = new Set(['Business Name', 'Limited Company (Ltd)', 'Incorporated Trustee']);
@@ -311,6 +731,14 @@ export function getRegistrationProgress(stage = 'data') {
   };
 
   return progressByStage[stage] ?? progressByStage.data;
+}
+
+export function getNextApplicationStage(stage = 'data') {
+  const stages = ['data', 'payment', 'verifying', 'waiting', 'registered'];
+  const normalizedStage = stage === 'documents' ? 'data' : stage;
+  const currentIndex = stages.indexOf(normalizedStage);
+  if (currentIndex < 0) return 'data';
+  return stages[Math.min(currentIndex + 1, stages.length - 1)];
 }
 
 const applicationTimeline = [
@@ -394,21 +822,52 @@ export function getRegistrationGuidance(step = 'data') {
   return registrationGuidance[step] || registrationGuidance.data;
 }
 
-export function getRegulAIReply(question = '') {
+export function getRegulAIReply(question = '', language = 'en') {
   const normalizedQuestion = String(question ?? '').toLowerCase();
+  const replies = {
+    en: {
+      documents: 'For this demo, prepare a government-issued identity document and a passport photograph. Use the mock checks to mark both ready.',
+      timing: 'Your application moves from business details to document check, payment, and verification. The dashboard shows each stage as it changes.',
+      payment: 'This prototype uses a ₦25,000 sandbox filing fee. No real payment is taken.',
+      status: 'Your workspace tracks data, payment, verification, CAC waiting, and registration in one view.',
+      fallback: 'I can help with documents, timing, payment, or your current application status. Try one of those questions.',
+    },
+    yo: {
+      documents: 'Fún àpẹẹrẹ yìí, pèsè ìwé ìdánimọ̀ tí ìjọba fún àti fọ́tò passport. Lo àyẹ̀wò àpẹẹrẹ láti mú méjèèjì ṣetán.',
+      timing: 'Ìforúkọsílẹ̀ rẹ máa lọ láti àlàyé iṣẹ́ sí àyẹ̀wò ìwé, ìsanwó, àti ìdánwò. Dashboard máa fi ipele kọ̀ọ̀kan hàn.',
+      payment: 'Àpẹẹrẹ yìí lo ₦25,000 gẹ́gẹ́ bí owó sandbox. A kò gba owó gidi.',
+      status: 'Workspace rẹ máa tọ́pinpin àlàyé, ìsanwó, ìdánwò, dídúró de CAC, àti ìforúkọsílẹ̀.',
+      fallback: 'Mo lè ràn ọ́ lọ́wọ́ pẹ̀lú ìwé, àkókò, ìsanwó, tàbí ipò ìforúkọsílẹ̀ rẹ. Gbìyànjú ọ̀kan nínú wọn.',
+    },
+    ha: {
+      documents: 'Don wannan demo, shirya takardar shaidar gwamnati da hoton fasfo. Yi amfani da gwajin samfurin don shirya su.',
+      timing: 'Rajistarku tana wucewa daga bayanan kasuwanci zuwa duba takardu, biyan kuɗi, da tantancewa. Dashboard yana nuna kowane mataki.',
+      payment: 'Wannan samfurin yana amfani da kuɗin sandbox ₦25,000. Ba a karɓi kuɗi na gaske ba.',
+      status: 'Workspace ɗinku yana bin bayanai, biyan kuɗi, tantancewa, jiran CAC, da rajista a wuri ɗaya.',
+      fallback: 'Zan iya taimakawa da takardu, lokaci, biyan kuɗi, ko matsayin rajista. Gwada ɗaya daga cikinsu.',
+    },
+    ig: {
+      documents: 'Maka ngosi aịza a gọọmentị nyere na foto paspọtụ. Jiri nyocha atụ mee ka ha abụọ dị njikere.',
+      timing: 'Ndebanye aha gị na-aga site na nkọwa azụmahịa gaa na nyocha akwụkwọ, ịkwụ ụgwọ, na nyocha. Dashboard na-egosi ọkwa ọ bụla.',
+      payment: 'Ihe atụ a na-eji ụgwọ sandbox ₦25,000. A naghị ewere ezigbo ego.',
+      status: 'Workspace gị na-edobe nkọwa, ịkwụ ụgwọ, nyocha, ichere CAC, na ndebanye aha n’otu ebe.',
+      fallback: 'Enwere m ike inyere gị aka na akwụkwọ, oge, ịkwụ ụgwọ, ma ọ bụ ọnọdụ ndebanye aha. Gbalịa otu n’ime ha.',
+    },
+  };
+  const copy = replies[language] || replies.en;
 
-  if (/(document|identity|passport|upload)/.test(normalizedQuestion)) {
-    return 'For this demo, prepare a government-issued identity document and a passport photograph. Use the mock checks to mark both ready.';
+  if (/(document|identity|passport|upload|ìwé|ìdánimọ̀|fọ́tò|takardu|takarda|fasfo|hoto|shaidar|akwụkwọ|akwukwo|paspọtụ|foto|njirimara)/.test(normalizedQuestion)) {
+    return copy.documents;
   }
-  if (/(long|time|when|soon|turnaround)/.test(normalizedQuestion)) {
-    return 'Your application moves from business details to document check, payment, and verification. The dashboard shows each stage as it changes.';
+  if (/(long|time|when|soon|turnaround|àkókò|ìgbà|melo|lokaci|yaushe|tsawon|oge|mgbe|ogologo)/.test(normalizedQuestion)) {
+    return copy.timing;
   }
-  if (/(pay|fee|cost|price|charge)/.test(normalizedQuestion)) {
-    return 'This prototype uses a ₦25,000 sandbox filing fee. No real payment is taken.';
+  if (/(pay|fee|cost|price|charge|ìsanwó|owó|ìye|biya|kuɗi|kudi|farashi|ịkwụ|ego|ụgwọ|ugwo)/.test(normalizedQuestion)) {
+    return copy.payment;
   }
-  if (/(status|progress|application|where)/.test(normalizedQuestion)) {
-    return 'Your workspace tracks data, payment, verification, CAC waiting, and registration in one view.';
+  if (/(status|progress|application|where|ipò|ìforúkọsílẹ̀|ìlọsíwájú|matsayi|rajista|aikace|ci gaba|ọnọdụ|ndebanye|ngwa|ọkwa)/.test(normalizedQuestion)) {
+    return copy.status;
   }
 
-  return 'I can help with documents, timing, payment, or your current application status. Try one of those questions.';
+  return copy.fallback;
 }

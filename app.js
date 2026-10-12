@@ -1,19 +1,22 @@
 import {
+  checkBusinessNameAvailability,
+  createBrandAssets,
   createBrandKit,
   createRegistrationDraft,
   getApplicationTimeline,
   getLocalizedCopy,
+  getNextApplicationStage,
   getRegistrationGuidance,
   getRegistrationProgress,
   getRegulAIReply,
   isValidEmail,
   normalizeBusinessName,
-  validateDocumentFile,
   validateRegistrationDetails,
+  verifyDocumentReadiness,
 } from './app-core.js';
 
 const STORAGE_KEY = 'regulai-client-prototype-v1';
-const validRoutes = new Set(['landing', 'login', 'register', 'dashboard']);
+const validRoutes = new Set(['landing', 'login', 'register', 'dashboard', 'admin']);
 const registrationSteps = [
   { id: 'data', label: 'Business details' },
   { id: 'documents', label: 'Document check' },
@@ -25,15 +28,18 @@ const defaultState = {
   draft: null,
   brandKit: { themeId: 'meadow' },
   registrationStep: 'data',
+  notifications: [],
 };
 
 let state = loadState();
 let toastTimeout;
 let brandPreviewTrigger = null;
 let brandPreviewThemeId = 'meadow';
+let brandPreviewOutput = 'logo';
 let timelineTrigger = null;
 let guideTrigger = null;
 let accountMenuTrigger = null;
+let notificationTrigger = null;
 
 const screens = [...document.querySelectorAll('[data-screen]')];
 const toast = document.querySelector('#toast');
@@ -41,6 +47,7 @@ const brandModal = document.querySelector('#brand-modal');
 const timelineModal = document.querySelector('#timeline-modal');
 const guideModal = document.querySelector('#guide-modal');
 const accountPopover = document.querySelector('#account-popover');
+const notificationsModal = document.querySelector('#notifications-modal');
 const publicNav = document.querySelector('.public-nav');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const mobileMenu = document.querySelector('[data-mobile-menu]');
@@ -106,6 +113,37 @@ function showToast(message) {
   toastTimeout = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
 
+function addNotification(title, message, type = 'info') {
+  state.notifications ||= [];
+  const duplicate = state.notifications.some((notification) => notification.title === title && notification.message === message);
+  if (duplicate) return;
+  state.notifications.unshift({
+    id: `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    title,
+    message,
+    type,
+    read: false,
+    createdAt: new Date().toISOString(),
+  });
+  state.notifications = state.notifications.slice(0, 8);
+  saveState();
+}
+
+function seedDemoNotifications() {
+  if (state.notifications?.length) return;
+  state.notifications = [
+    {
+      id: 'demo-welcome',
+      title: 'Demo workspace ready',
+      message: 'Your saved application, tracker, and starter brand assets are available in this browser.',
+      type: 'info',
+      read: false,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+  saveState();
+}
+
 function appendChatMessage(message, role = 'ai') {
   const messages = document.querySelector('#dashboard-chat-messages');
   if (!messages) return;
@@ -143,6 +181,19 @@ function activeBrandKit(themeId = state.draft?.brandKit?.themeId || state.brandK
   });
 }
 
+function activeBrandAssets(themeId = state.draft?.brandKit?.themeId || state.brandKit?.themeId || 'meadow') {
+  if (state.draft?.stage === 'registered') ensureRegisteredDetails();
+  return createBrandAssets({
+    businessName: state.draft?.businessName || 'Ayo’s Table',
+    description: state.draft?.description || 'Warm meals. Good company.',
+    serviceList: state.draft?.serviceList || '',
+    contactEmail: state.draft?.contactEmail || '',
+    contactPhone: state.draft?.contactPhone || '',
+    registrationNumber: state.draft?.registrationNumber || '',
+    themeId,
+  });
+}
+
 function paintSwatches(selector, colors) {
   document.querySelectorAll(selector).forEach((swatch, index) => {
     swatch.style.backgroundColor = colors[index] || '';
@@ -150,7 +201,7 @@ function paintSwatches(selector, colors) {
 }
 
 function renderDashboardBrandKit() {
-  const kit = activeBrandKit();
+  const kit = activeBrandAssets().brand;
   const preview = document.querySelector('#dashboard-brand-preview');
   const logo = document.querySelector('#dashboard-brand-preview .brand-kit-logo');
   const plus = document.querySelector('#dashboard-brand-preview .brand-kit-plus');
@@ -169,7 +220,8 @@ function renderDashboardBrandKit() {
 }
 
 function renderBrandPreview() {
-  const kit = activeBrandKit(brandPreviewThemeId);
+  const assets = activeBrandAssets(brandPreviewThemeId);
+  const kit = assets.brand;
   const preview = document.querySelector('#brand-large-preview');
   if (!preview) return;
 
@@ -187,12 +239,43 @@ function renderBrandPreview() {
     button.classList.toggle('is-selected', isSelected);
     button.setAttribute('aria-pressed', String(isSelected));
   });
+  document.querySelectorAll('[data-action="select-brand-output"]').forEach((button) => {
+    const isSelected = button.dataset.brandOutput === brandPreviewOutput;
+    button.classList.toggle('is-selected', isSelected);
+    button.setAttribute('aria-pressed', String(isSelected));
+  });
+
+  const logoOutput = document.querySelector('#brand-logo-output');
+  const profileOutput = document.querySelector('#brand-profile-output');
+  const landingOutput = document.querySelector('#brand-landing-output');
+  if (logoOutput) logoOutput.hidden = brandPreviewOutput !== 'logo';
+  if (profileOutput) profileOutput.hidden = brandPreviewOutput !== 'profile';
+  if (landingOutput) landingOutput.hidden = brandPreviewOutput !== 'landing';
+  if (profileOutput) {
+    setText('#brand-profile-name', assets.profile.businessName);
+    setText('#brand-profile-registration', assets.profile.registrationNumber);
+    setText('#brand-profile-about', assets.profile.about);
+    setText('#brand-profile-email', assets.profile.contactEmail);
+    setText('#brand-profile-phone', assets.profile.contactPhone);
+    const services = document.querySelector('#brand-profile-services');
+    if (services) services.innerHTML = assets.profile.services.map((service) => `<li>${escapeHtml(service)}</li>`).join('');
+  }
+  if (landingOutput) {
+    setText('#brand-landing-name', assets.landing.businessName);
+    setText('#brand-landing-tagline', assets.landing.tagline);
+    setText('#brand-landing-about', assets.landing.about);
+    setText('#brand-landing-email', assets.landing.contactEmail);
+    setText('#brand-landing-phone', assets.landing.contactPhone);
+    const services = document.querySelector('#brand-landing-services');
+    if (services) services.innerHTML = assets.landing.services.map((service) => `<span>${escapeHtml(service)}</span>`).join('');
+  }
 }
 
-function showBrandPreview(trigger = null) {
+function showBrandPreview(trigger = null, output = 'logo') {
   if (!brandModal) return;
   brandPreviewTrigger = trigger;
-  brandPreviewThemeId = activeBrandKit(state.draft?.brandKit?.themeId || state.brandKit?.themeId || 'meadow').theme.id;
+  brandPreviewThemeId = activeBrandAssets(state.draft?.brandKit?.themeId || state.brandKit?.themeId || 'meadow').brand.theme.id;
+  brandPreviewOutput = output;
   renderBrandPreview();
   brandModal.hidden = false;
   document.body.classList.add('brand-modal-open');
@@ -218,8 +301,15 @@ function saveBrandKitDirection() {
 }
 
 function copyBrandProfile() {
-  const kit = activeBrandKit(brandPreviewThemeId);
-  const profile = `${kit.businessName}\n${kit.descriptor}\n\nStarter kit: logo concept, company profile, and landing-page direction.`;
+  const assets = activeBrandAssets(brandPreviewThemeId);
+  const profile = [
+    assets.profile.businessName,
+    assets.profile.registrationNumber,
+    '',
+    `About: ${assets.profile.about}`,
+    `Services: ${assets.profile.services.join(', ')}`,
+    `Contact: ${assets.profile.contactEmail} · ${assets.profile.contactPhone}`,
+  ].join('\n');
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(profile).then(
       () => showToast('Company profile copied.'),
@@ -264,16 +354,50 @@ function closeApplicationTimeline() {
   timelineTrigger = null;
 }
 
+function renderNotifications() {
+  const list = document.querySelector('#notifications-list');
+  if (!list) return;
+  const notifications = state.notifications || [];
+  list.innerHTML = notifications.length
+    ? notifications.map((notification) => `<article class="notification-item ${notification.read ? 'is-read' : ''}">
+        <span class="notification-dot notification-dot-${escapeHtml(notification.type || 'info')}" aria-hidden="true"></span>
+        <div><strong>${escapeHtml(notification.title)}</strong><p>${escapeHtml(notification.message)}</p><small>Local demo update</small></div>
+      </article>`).join('')
+    : '<p class="empty-state">No updates yet. Your application activity will appear here.</p>';
+  state.notifications = notifications.map((notification) => ({ ...notification, read: true }));
+  saveState();
+  document.querySelector('#notification-count')?.setAttribute('hidden', '');
+}
+
+function showNotifications(trigger = null) {
+  if (!notificationsModal) return;
+  notificationTrigger = trigger;
+  renderNotifications();
+  notificationsModal.hidden = false;
+  document.body.classList.add('timeline-modal-open');
+  notificationsModal.querySelector('.timeline-modal-close')?.focus();
+}
+
+function closeNotifications() {
+  if (!notificationsModal || notificationsModal.hidden) return;
+  notificationsModal.hidden = true;
+  document.body.classList.remove('timeline-modal-open');
+  notificationTrigger?.focus();
+  notificationTrigger = null;
+}
+
 function renderRegistrationGuide() {
   const guidance = getRegistrationGuidance(state.registrationStep);
-  setText('#guide-modal-eyebrow', guidance.eyebrow);
-  setText('#guide-modal-title', guidance.title);
-  setText('#guide-modal-intro', guidance.intro);
-  setText('#guide-modal-footer-copy', guidance.footer);
+  const registrationCopy = getLocalizedCopy(state.language).registration[state.registrationStep];
+  setText('#guide-modal-eyebrow', registrationCopy?.eyebrow || guidance.eyebrow);
+  setText('#guide-modal-title', registrationCopy?.heading || guidance.title);
+  setText('#guide-modal-intro', registrationCopy?.intro || guidance.intro);
+  setText('#guide-modal-footer-copy', registrationCopy?.note || guidance.footer);
   const list = document.querySelector('#guide-modal-list');
   if (!list) return;
 
-  list.innerHTML = guidance.items.map((item, index) => `<div class="guide-item">
+  const guideItems = registrationCopy?.items || guidance.items;
+  list.innerHTML = guideItems.map((item, index) => `<div class="guide-item">
     <span class="guide-item-number">${String(index + 1).padStart(2, '0')}</span>
     <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></div>
   </div>`).join('');
@@ -336,7 +460,7 @@ function trapDialogFocus(container, event) {
 
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
-  if (!accountPopover.contains(document.activeElement)) {
+  if (!container.contains(document.activeElement)) {
     event.preventDefault();
     (event.shiftKey ? last : first).focus();
     return;
@@ -352,7 +476,7 @@ function trapDialogFocus(container, event) {
 }
 
 function trapOpenDialogFocus(event) {
-  const openDialog = [accountPopover, brandModal, timelineModal, guideModal]
+  const openDialog = [accountPopover, brandModal, timelineModal, guideModal, notificationsModal]
     .find((dialog) => dialog && !dialog.hidden);
   trapDialogFocus(openDialog, event);
 }
@@ -378,7 +502,7 @@ function showGuideChat(question = '') {
 
   if (question) {
     appendChatMessage(question, 'user');
-    appendChatMessage(getRegulAIReply(question));
+    appendChatMessage(getRegulAIReply(question, state.language));
   }
 
   document.querySelector('#chat-input')?.focus();
@@ -393,7 +517,7 @@ function handleChatSubmit(form) {
   }
 
   appendChatMessage(message, 'user');
-  appendChatMessage(getRegulAIReply(message));
+  appendChatMessage(getRegulAIReply(message, state.language));
   form.reset();
   input?.focus();
 }
@@ -413,12 +537,13 @@ function syncLanguageControls() {
 
 function navigate(route, updateHash = true) {
   const targetRoute = validRoutes.has(route) ? route : 'landing';
-  if (targetRoute === 'dashboard' && !state.user) {
+  if (['dashboard', 'admin'].includes(targetRoute) && !state.user) {
     if (window.location.hash !== '#login') history.replaceState(null, '', '#login');
     navigate('login', false);
     showToast('Sign in to open your workspace.');
     return;
   }
+  if (accountPopover && !accountPopover.hidden) closeAccountMenu();
   setMobileMenu(false);
   if (targetRoute === 'landing') setActiveLandingSection(null);
 
@@ -434,6 +559,7 @@ function navigate(route, updateHash = true) {
 
   if (targetRoute === 'register') renderRegistration();
   if (targetRoute === 'dashboard') renderDashboard();
+  if (targetRoute === 'admin') renderAdmin();
   syncLanguageControls();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -470,58 +596,70 @@ function renderRegistration() {
 function renderBusinessStep() {
   const draft = state.draft || {};
   const businessType = draft.businessType || 'Business Name';
+  const copy = getLocalizedCopy(state.language).registration.data;
+  const nameCheck = draft.nameCheck;
+  const nameCheckMarkup = nameCheck
+    ? `<div class="name-check-result is-${escapeHtml(nameCheck.status)}" role="status"><span>${nameCheck.status === 'available' ? '✓' : '!'}</span><p>${escapeHtml(nameCheck.message)}</p></div>${nameCheck.suggestions?.length ? `<div class="name-suggestions"><span>Try one of these:</span>${nameCheck.suggestions.map((suggestion) => `<button type="button" data-suggested-name="${escapeHtml(suggestion)}">${escapeHtml(suggestion)}</button>`).join('')}</div>` : ''}`
+    : `<p class="field-hint">${escapeHtml(copy.checkPrompt)}</p>`;
   return `<div class="flow-stage-heading">
-    <div class="eyebrow">Step 1 of 3 · Business details</div>
-    <h1>Tell us about the business you’re building.</h1>
-    <p>You don’t need to know the official language. Start with the idea in your own words and we’ll help shape the application.</p>
+    <div class="eyebrow">${escapeHtml(copy.eyebrow)}</div>
+    <h1>${escapeHtml(copy.heading)}</h1>
+    <p>${escapeHtml(copy.intro)}</p>
   </div>
-  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />Welcome. What kind of business are you bringing to life?</p></div>
+  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />${escapeHtml(copy.guide)}</p></div>
   <form class="flow-form-card" id="business-form" novalidate>
     <div class="form-grid">
-      <label class="form-field"><span>Business name or idea</span><input id="business-name" name="businessName" type="text" value="${escapeHtml(draft.businessName || '')}" placeholder="e.g. Ayo’s Table" required maxlength="70" /></label>
-      <label class="form-field"><span>Business type</span><select id="business-type" name="businessType"><option${businessType === 'Business Name' ? ' selected' : ''}>Business Name</option><option${businessType === 'Limited Company (Ltd)' ? ' selected' : ''}>Limited Company (Ltd)</option><option${businessType === 'Incorporated Trustee' ? ' selected' : ''}>Incorporated Trustee</option></select></label>
+      <label class="form-field form-field-wide"><span>${escapeHtml(copy.nameLabel)}</span><div class="input-action-wrap"><input id="business-name" name="businessName" type="text" value="${escapeHtml(draft.businessName || '')}" placeholder="${escapeHtml(copy.namePlaceholder)}" required maxlength="70" /><button type="button" class="field-action" data-action="check-name">${escapeHtml(copy.checkName)}</button></div>${nameCheckMarkup}</label>
+      <label class="form-field"><span>${escapeHtml(copy.typeLabel)}</span><select id="business-type" name="businessType"><option${businessType === 'Business Name' ? ' selected' : ''}>Business Name</option><option${businessType === 'Limited Company (Ltd)' ? ' selected' : ''}>Limited Company (Ltd)</option><option${businessType === 'Incorporated Trustee' ? ' selected' : ''}>Incorporated Trustee</option></select></label>
     </div>
-    <div class="eyebrow" style="margin-top: 1px;">Need inspiration?</div>
+    <div class="eyebrow" style="margin-top: 1px;">${escapeHtml(copy.inspiration)}</div>
     <div class="suggestion-row"><button type="button" data-suggested-name="Ayo’s Table">Ayo’s Table</button><button type="button" data-suggested-name="Lush &amp; Local">Lush &amp; Local</button><button type="button" data-suggested-name="Northstar Repairs">Northstar Repairs</button></div>
-    <label class="form-field"><span>What does the business do?</span><textarea name="description" rows="3" placeholder="Tell us what you sell, make, or help people do.">${escapeHtml(draft.description || '')}</textarea></label>
+    <label class="form-field"><span>${escapeHtml(copy.descriptionLabel)}</span><textarea name="description" rows="3" placeholder="${escapeHtml(copy.descriptionPlaceholder)}">${escapeHtml(draft.description || '')}</textarea></label>
+    <label class="form-field"><span>${escapeHtml(copy.servicesLabel)}</span><input name="serviceList" type="text" value="${escapeHtml(draft.serviceList || '')}" placeholder="${escapeHtml(copy.servicesPlaceholder)}" /></label>
+    <div class="form-grid form-grid-contact"><label class="form-field"><span>${escapeHtml(copy.emailLabel)}</span><input name="contactEmail" type="email" value="${escapeHtml(draft.contactEmail || '')}" placeholder="hello@yourbusiness.com" /></label><label class="form-field"><span>${escapeHtml(copy.phoneLabel)}</span><input name="contactPhone" type="tel" value="${escapeHtml(draft.contactPhone || '')}" placeholder="+234 800 000 0000" /></label></div>
+    <p class="field-hint">${escapeHtml(copy.contactHint)}</p>
     <p class="form-error" id="business-error" role="alert"></p>
-    <div class="flow-form-actions"><span class="flow-note"><span>✦</span> You can change these details later.</span><button class="button button-dark" type="submit">Continue to documents <span aria-hidden="true">↗</span></button></div>
+    <div class="flow-form-actions"><span class="flow-note"><span>✦</span> ${escapeHtml(copy.note)}</span><button class="button button-dark" type="submit">${escapeHtml(copy.continue)} <span aria-hidden="true">↗</span></button></div>
   </form>`;
 }
 
 function renderDocumentsStep() {
   const draft = state.draft || createRegistrationDraft();
+  const copy = getLocalizedCopy(state.language).registration.documents;
   const documents = draft.documents || {};
   const documentFiles = draft.documentFiles || {};
   const documentErrors = draft.documentErrors || {};
+  const documentResults = draft.documentResults || {};
   return `<div class="flow-stage-heading">
-    <div class="eyebrow">Step 2 of 3 · Document check</div>
-    <h1>Let’s make sure your documents are ready.</h1>
-    <p>Upload clear copies of the documents needed for your Business Name application. This prototype checks quality and completeness before the next step.</p>
+    <div class="eyebrow">${escapeHtml(copy.eyebrow)}</div>
+    <h1>${escapeHtml(copy.heading)}</h1>
+    <p>${escapeHtml(copy.intro)}</p>
   </div>
-  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />A clear document now means less back-and-forth later. Choose a file or use a demo file for this prototype.</p></div>
+  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />${escapeHtml(copy.guide)}</p></div>
   <form class="flow-form-card" id="document-form">
     <div class="document-list">
-      ${renderDocumentRow('identity', '▤', 'Government-issued identity document', 'National ID, driver’s licence, or international passport', documents.identity, documentFiles.identity, documentErrors.identity, 'application/pdf,image/jpeg,image/png')}
-      ${renderDocumentRow('passport', '◉', 'Passport photograph', 'A recent, clear photo with a plain background', documents.passport, documentFiles.passport, documentErrors.passport, 'image/jpeg,image/png')}
+      ${renderDocumentRow('identity', '▤', copy.identityTitle, copy.identityDescription, documents.identity, documentFiles.identity, documentErrors.identity, documentResults.identity, 'application/pdf,image/jpeg,image/png', copy)}
+      ${renderDocumentRow('passport', '◉', copy.passportTitle, copy.passportDescription, documents.passport, documentFiles.passport, documentErrors.passport, documentResults.passport, 'image/jpeg,image/png', copy)}
     </div>
     <p class="form-error" id="document-error" role="alert"></p>
-    <div class="flow-form-actions"><button class="button button-quiet" type="button" data-action="previous-step">← Back</button><button class="button button-dark" type="submit">Review application <span aria-hidden="true">↗</span></button></div>
+    <div class="flow-form-actions"><button class="button button-quiet" type="button" data-action="previous-step">← ${escapeHtml(copy.back)}</button><button class="button button-dark" type="submit">${escapeHtml(copy.continue)} <span aria-hidden="true">↗</span></button></div>
   </form>`;
 }
 
-function renderDocumentRow(id, icon, title, description, status = 'pending', file = null, error = '', accept = '') {
+function renderDocumentRow(id, icon, title, description, status = 'pending', file = null, error = '', result = null, accept = '', copy = {}) {
   const passed = status === 'passed';
-  const failed = status === 'failed';
-  const statusLabel = passed ? 'Ready' : failed ? 'Needs attention' : 'Pending';
+  const flagged = status === 'flagged' || status === 'failed';
+  const statusLabel = passed ? (copy.ready || 'Ready') : flagged ? (copy.flagged || 'Review needed') : (copy.pending || 'Pending');
   const fileLabel = file?.name
     ? `${escapeHtml(file.name)}${Number(file.size) > 0 ? ` · ${formatFileSize(file.size)}` : ''}`
     : escapeHtml(description);
-  return `<div class="document-row ${failed ? 'has-error' : ''}">
+  const resultLabel = result?.confidence ? `Demo OCR confidence ${Math.round(result.confidence * 100)}%` : '';
+  return `<div class="document-row ${flagged ? 'has-error' : ''}">
     <span class="document-icon" aria-hidden="true">${icon}</span>
     <div class="document-copy"><strong>${title}</strong><span>${fileLabel}</span>${error ? `<small class="document-error" role="alert">${escapeHtml(error)}</small>` : ''}</div>
-    <span class="document-status ${passed ? 'is-passed' : ''} ${failed ? 'is-failed' : ''}"><i></i>${statusLabel}</span>
-    <div class="document-actions"><label class="upload-button" for="${id}-file">${file ? 'Replace file' : 'Choose file'}</label><input class="document-file-input" id="${id}-file" type="file" data-document-input="${id}" accept="${accept}" /><button class="demo-file-button" type="button" data-action="mock-upload" data-document="${id}">Use demo file</button></div>
+    <span class="document-status ${passed ? 'is-passed' : ''} ${flagged ? 'is-failed' : ''}"><i></i>${statusLabel}</span>
+    ${resultLabel ? `<small class="document-result">${resultLabel}</small>` : ''}
+    <div class="document-actions"><label class="upload-button" for="${id}-file">${file ? (copy.replace || 'Replace file') : (copy.choose || 'Choose file')}</label><input class="document-file-input" id="${id}-file" type="file" data-document-input="${id}" accept="${accept}" /><button class="demo-file-button" type="button" data-action="mock-upload" data-document="${id}">${copy.demo || 'Use demo file'}</button></div>
   </div>`;
 }
 
@@ -543,6 +681,9 @@ function ensureDocumentState() {
   state.draft.documentErrors ||= {};
   state.draft.documentErrors.identity ??= '';
   state.draft.documentErrors.passport ??= '';
+  state.draft.documentResults ||= {};
+  state.draft.documentResults.identity ??= null;
+  state.draft.documentResults.passport ??= null;
 }
 
 const demoDocumentFiles = {
@@ -558,27 +699,31 @@ function applyDocumentFile(documentType, file) {
     mimeType: String(file?.type || file?.mimeType || ''),
     size: Number(file?.size) || 0,
   };
-  const result = validateDocumentFile({ documentType, ...metadata });
+  const result = verifyDocumentReadiness({ documentType, ...metadata });
   state.draft.documentFiles[documentType] = metadata;
-  state.draft.documents[documentType] = result.valid ? 'passed' : 'failed';
-  state.draft.documentErrors[documentType] = result.valid ? '' : result.message;
+  state.draft.documents[documentType] = result.status;
+  state.draft.documentErrors[documentType] = result.status === 'passed' ? '' : result.message;
+  state.draft.documentResults[documentType] = result;
   saveState();
   renderRegistration();
-  showToast(result.valid ? `${metadata.name} checked and marked ready.` : result.message);
+  showToast(result.status === 'passed' ? `${metadata.name} checked and marked ready.` : result.message);
 }
 
 function renderPaymentStep() {
   const draft = state.draft || {};
+  const copy = getLocalizedCopy(state.language).registration.payment;
+  const paymentError = draft.paymentError ? `<div class="payment-error" role="alert"><strong>Payment was not completed.</strong><span>${escapeHtml(draft.paymentError)}</span></div>` : '';
   return `<div class="flow-stage-heading">
-    <div class="eyebrow">Step 3 of 3 · Payment &amp; filing</div>
-    <h1>Your application is ready to move.</h1>
-    <p>Review the details below. In the full system this step connects to a sandbox payment flow before the application enters verification.</p>
+    <div class="eyebrow">${escapeHtml(copy.eyebrow)}</div>
+    <h1>${escapeHtml(copy.heading)}</h1>
+    <p>${escapeHtml(copy.intro)}</p>
   </div>
-  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />Everything looks ready. Once payment is confirmed, your application moves to the verification queue.</p></div>
+  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />${escapeHtml(copy.guide)}</p></div>
   <form class="flow-form-card" id="payment-form">
     <div class="review-grid"><div class="review-item"><span>Business name</span><strong>${escapeHtml(draft.businessName || 'Your business')}</strong></div><div class="review-item"><span>Registration type</span><strong>${escapeHtml(draft.businessType || 'Business Name')}</strong></div><div class="review-item review-item-wide"><span>What the business does</span><strong>${escapeHtml(draft.description || 'Description to be confirmed')}</strong></div><div class="review-item"><span>Documents</span><strong>2 files · quality checked</strong></div><div class="review-item"><span>Preferred language</span><strong>${languageLabel(state.language)}</strong></div></div>
-    <div class="payment-summary"><div><span>Mock filing fee</span><strong>₦25,000</strong></div><small>Government charges included<br />Sandbox payment</small></div>
-    <div class="flow-form-actions"><button class="button button-quiet" type="button" data-action="previous-step">← Back</button><button class="button button-dark" type="submit">Pay &amp; queue application <span aria-hidden="true">↗</span></button></div>
+    <div class="payment-summary"><div><span>${escapeHtml(copy.fee)}</span><strong>₦25,000</strong></div><small>${escapeHtml(copy.sandbox)}</small></div>
+    ${paymentError}
+    <div class="flow-form-actions"><button class="button button-quiet" type="button" data-action="previous-step">← ${escapeHtml(copy.back)}</button><div class="payment-actions"><button class="button button-quiet" type="submit" name="paymentOutcome" value="failed">${escapeHtml(copy.retry)}</button><button class="button button-dark" type="submit" name="paymentOutcome" value="success">${escapeHtml(copy.submit)} <span aria-hidden="true">↗</span></button></div></div>
   </form>`;
 }
 
@@ -589,6 +734,109 @@ function languageLabel(language) {
 function trackerStage(stage) {
   if (stage === 'documents') return 'data';
   return stage || 'data';
+}
+
+function demoNumber(prefix, value) {
+  const hash = String(value || 'regulai').split('').reduce((total, character) => ((total * 31) + character.charCodeAt(0)) % 10_000_000, 0);
+  return `${prefix}-${String(hash).padStart(7, '0')}`;
+}
+
+function ensureRegisteredDetails() {
+  if (!state.draft) return;
+  state.draft.registrationNumber ||= demoNumber('BN', state.draft.businessName);
+  state.draft.tinNumber ||= demoNumber('TIN', `${state.draft.businessName}-tin`);
+  state.draft.registeredAt ||= new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function renderCertificateCard() {
+  const card = document.querySelector('#certificate-card');
+  const draft = state.draft;
+  if (!card) return;
+  const isRegistered = draft?.stage === 'registered';
+  card.hidden = !isRegistered;
+  if (!isRegistered) return;
+  ensureRegisteredDetails();
+  setText('#certificate-business-name', draft.businessName || 'Your business');
+  setText('#certificate-number', draft.registrationNumber);
+  setText('#certificate-tin', draft.tinNumber);
+  setText('#certificate-date', draft.registeredAt);
+}
+
+function advanceDemoStatus() {
+  if (!state.draft) return;
+  const currentStage = trackerStage(state.draft.stage);
+  const nextStage = getNextApplicationStage(currentStage);
+  if (nextStage === currentStage || currentStage === 'data') {
+    showToast('Complete the registration and mock payment before advancing the demo status.');
+    return;
+  }
+
+  state.draft.stage = nextStage;
+  if (nextStage === 'waiting') {
+    addNotification('Application is waiting for CAC', 'The demo verification step is complete. Your application is now waiting for CAC.', 'info');
+  }
+  if (nextStage === 'registered') {
+    ensureRegisteredDetails();
+    addNotification('Registration marked complete', 'Your demo certificate and TIN are ready to view in the workspace.', 'success');
+  }
+  saveState();
+  renderDashboard();
+  showToast(nextStage === 'registered' ? 'Demo registration completed.' : 'Demo status advanced to Waiting for CAC.');
+}
+
+function downloadTextFile(filename, content, type = 'text/plain') {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadCertificate() {
+  if (!state.draft) return;
+  ensureRegisteredDetails();
+  const content = [
+    'REGULAI DEMO CERTIFICATE SUMMARY',
+    '',
+    `Business name: ${state.draft.businessName}`,
+    `Registration number: ${state.draft.registrationNumber}`,
+    `TIN: ${state.draft.tinNumber}`,
+    `Date registered: ${state.draft.registeredAt}`,
+    '',
+    'This is a client-only demonstration record and not an official CAC certificate.',
+  ].join('\n');
+  downloadTextFile('regulai-demo-certificate.txt', content);
+  showToast('Demo certificate summary downloaded.');
+}
+
+function downloadBrandProfile() {
+  const assets = activeBrandAssets(brandPreviewThemeId);
+  const content = [
+    'COMPANY PROFILE · REGULAI DEMO',
+    '',
+    `Business name: ${assets.profile.businessName}`,
+    `Registration number: ${assets.profile.registrationNumber}`,
+    '',
+    `About us: ${assets.profile.about}`,
+    `Products / services: ${assets.profile.services.join(', ')}`,
+    `Contact: ${assets.profile.contactEmail} · ${assets.profile.contactPhone}`,
+    '',
+    'Generated locally from the registration details in this prototype.',
+  ].join('\n');
+  downloadTextFile(`${assets.profile.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-company-profile.txt`, content);
+  showToast('Company profile downloaded.');
+}
+
+function downloadBrandLandingPage() {
+  const assets = activeBrandAssets(brandPreviewThemeId);
+  const serviceMarkup = assets.landing.services.map((service) => `<li>${escapeHtml(service)}</li>`).join('');
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(assets.landing.businessName)}</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:48px;color:#132b29}header{border-bottom:3px solid ${assets.landing.theme.accent};padding-bottom:24px}h1{font-size:48px;margin:16px 0 8px}em{color:${assets.landing.theme.secondary}}section{padding:32px 0}li{margin:10px 0}footer{padding-top:24px;border-top:1px solid #d5ddd2;color:#526b62}</style></head><body><header><strong>${escapeHtml(assets.landing.businessName)}</strong><h1>${escapeHtml(assets.landing.tagline)}</h1><p>${escapeHtml(assets.landing.about)}</p></header><section><h2>What we offer</h2><ul>${serviceMarkup}</ul></section><footer>${escapeHtml(assets.landing.contactEmail)} · ${escapeHtml(assets.landing.contactPhone)}</footer></body></html>`;
+  downloadTextFile(`${assets.landing.businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-landing-page.html`, html, 'text/html');
+  showToast('Landing-page template downloaded.');
 }
 
 function renderDashboard() {
@@ -612,7 +860,7 @@ function renderDashboard() {
   setText('#dashboard-heading', copy.dashboard.heading);
   setText('#dashboard-subheading', copy.dashboard.subheading);
   setText('#dashboard-continue-label', copy.dashboard.continueRegistration);
-  setText('#dashboard-status-label', copy.dashboard.applicationInProgress);
+  setText('#dashboard-status-label', draft?.stage === 'registered' ? copy.tracker.registered : copy.dashboard.applicationInProgress);
   setText('#dashboard-current-progress-label', copy.dashboard.currentProgress);
   setText('#dashboard-timeline-label', copy.dashboard.viewTimeline);
   setText('#dashboard-chat-eyebrow', copy.dashboard.alwaysAvailable);
@@ -631,13 +879,81 @@ function renderDashboard() {
     const localizedQuestion = quickQuestionCopy[index] || question.dataset.chatQuestion;
     if (label) label.textContent = localizedQuestion;
   });
+  const unreadNotifications = (state.notifications || []).filter((notification) => !notification.read).length;
+  const notificationCount = document.querySelector('#notification-count');
+  if (notificationCount) {
+    notificationCount.textContent = String(unreadNotifications);
+    notificationCount.hidden = unreadNotifications === 0;
+  }
+  const advanceStatusButton = document.querySelector('[data-action="advance-status"]');
+  if (advanceStatusButton) {
+    const canAdvance = ['verifying', 'waiting'].includes(draft?.stage);
+    advanceStatusButton.hidden = !canAdvance;
+    advanceStatusButton.querySelector('[data-advance-status-label]')?.replaceChildren(document.createTextNode(draft?.stage === 'waiting' ? 'Mark as registered' : 'Advance demo status'));
+  }
   document.querySelector('#status-tracker').innerHTML = timeline.map((item, index) => {
     const done = item.status === 'complete';
     const active = item.status === 'current';
     return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span>${copy.tracker[item.id] || item.label}</span></div>`;
   }).join('');
   renderDashboardBrandKit();
+  renderCertificateCard();
   resetGuideChat();
+}
+
+function renderAdmin() {
+  const draft = state.draft;
+  const tableBody = document.querySelector('#admin-application-list');
+  const status = draft?.adminStatus === 'query' ? 'Query raised' : draft?.adminStatus === 'resubmitted' ? 'Resubmitted' : draft?.stage === 'registered' ? 'Registered' : 'In progress';
+  const documents = draft?.documents || {};
+  const flagged = draft?.adminStatus === 'query' || Object.values(documents).includes('flagged');
+  const documentsReady = ['identity', 'passport'].every((documentType) => documents[documentType] === 'passed');
+  setText('#admin-applicant-name', state.user?.name || 'Demo applicant');
+  setText('#admin-active-count', draft ? '1' : '0');
+  setText('#admin-flagged-count', flagged ? '1' : '0');
+  setText('#admin-status-count', status);
+  setText('#admin-status-note', draft ? `${draft.businessName || 'Unnamed business'} · ${status}` : 'No demo application yet');
+  if (!tableBody) return;
+
+  if (!draft) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="empty-table">Open the demo account and start a registration to populate this view.</td></tr>';
+    return;
+  }
+
+  const documentStatus = flagged ? 'Flagged for review' : documentsReady ? 'Passed' : 'Awaiting documents';
+  const action = flagged
+    ? '<button type="button" class="table-action" data-action="admin-mark-resubmitted">Mark resubmitted</button>'
+    : documentsReady
+      ? '<button type="button" class="table-action" data-action="admin-request-resubmission">Request resubmission</button>'
+      : '<span class="table-action-muted">Waiting for both files</span>';
+  tableBody.innerHTML = `<tr><td><strong>${escapeHtml(draft.businessName || 'Unnamed business')}</strong><small>${escapeHtml(state.user?.email || 'demo@regulai.local')}</small></td><td>${escapeHtml(status)}</td><td><span class="admin-document-state ${flagged ? 'is-flagged' : 'is-passed'}"><i></i>${documentStatus}</span></td><td>${draft.stage === 'registered' ? 'Ready' : 'Awaiting next step'}</td><td>${action}</td></tr>`;
+}
+
+function adminRequestResubmission() {
+  if (!state.draft) return;
+  ensureDocumentState();
+  state.draft.adminStatus = 'query';
+  state.draft.documents.passport = 'flagged';
+  state.draft.documentErrors.passport = 'Admin demo query: upload a brighter passport photograph.';
+  state.draft.documentResults.passport = { status: 'flagged', confidence: 0.42, extractedFields: {}, message: state.draft.documentErrors.passport };
+  addNotification('Action needed: passport photo', 'The demo reviewer requested a clearer passport photograph before filing.', 'warning');
+  saveState();
+  renderAdmin();
+  showToast('Demo resubmission request created.');
+}
+
+function adminMarkResubmitted() {
+  if (!state.draft) return;
+  ensureDocumentState();
+  state.draft.adminStatus = 'resubmitted';
+  state.draft.documents.passport = 'passed';
+  state.draft.documentErrors.passport = '';
+  state.draft.documentFiles.passport = demoDocumentFiles.passport;
+  state.draft.documentResults.passport = verifyDocumentReadiness({ documentType: 'passport', ...demoDocumentFiles.passport });
+  addNotification('Document resubmitted', 'The demo passport photograph passed the follow-up readiness check.', 'success');
+  saveState();
+  renderAdmin();
+  showToast('Demo document marked as resubmitted.');
 }
 
 function setError(selector, message) {
@@ -654,11 +970,44 @@ function ensureUser() {
   if (!state.user) state.user = { name: 'Ayo Olatunji', email: 'demo@regulai.local' };
 }
 
-function handleBusinessSubmit(form) {
+function readBusinessDetails(form) {
   const data = new FormData(form);
-  const businessName = normalizeBusinessName(data.get('businessName'));
-  const businessType = String(data.get('businessType') || '');
-  const description = String(data.get('description') || '').trim();
+  return {
+    businessName: normalizeBusinessName(data.get('businessName')),
+    businessType: String(data.get('businessType') || ''),
+    description: String(data.get('description') || '').trim(),
+    serviceList: String(data.get('serviceList') || '').trim(),
+    contactEmail: String(data.get('contactEmail') || '').trim(),
+    contactPhone: String(data.get('contactPhone') || '').trim(),
+  };
+}
+
+function updateBusinessDraft(details, nameCheck) {
+  const previousName = state.draft?.businessName;
+  const existingDraft = state.draft || createRegistrationDraft({ ...details, language: state.language });
+  state.draft = {
+    ...existingDraft,
+    ...details,
+    businessName: normalizeBusinessName(details.businessName),
+    businessType: normalizeBusinessName(details.businessType) || 'Business Name',
+    description: normalizeBusinessName(details.description),
+    serviceList: normalizeBusinessName(details.serviceList),
+    contactEmail: normalizeBusinessName(details.contactEmail),
+    contactPhone: normalizeBusinessName(details.contactPhone),
+    language: state.language,
+    nameCheck,
+  };
+  if (previousName && previousName !== state.draft.businessName) {
+    state.draft.registrationNumber = '';
+    state.draft.tinNumber = '';
+    state.draft.registeredAt = '';
+  }
+  return state.draft;
+}
+
+function handleBusinessSubmit(form) {
+  const details = readBusinessDetails(form);
+  const { businessName, businessType } = details;
   const errors = validateRegistrationDetails({ businessName, businessType });
   if (Object.keys(errors).length > 0) {
     setError('#business-error', Object.values(errors)[0]);
@@ -667,12 +1016,35 @@ function handleBusinessSubmit(form) {
     return;
   }
 
-  state.draft = createRegistrationDraft({ businessName, businessType, description, language: state.language });
+  const nameCheck = checkBusinessNameAvailability(businessName);
+  if (nameCheck.status !== 'available') {
+    setError('#business-error', nameCheck.message);
+    updateBusinessDraft(details, nameCheck);
+    saveState();
+    renderRegistration();
+    document.querySelector('#business-name')?.focus();
+    showToast(nameCheck.message);
+    return;
+  }
+
+  updateBusinessDraft(details, nameCheck);
+  state.draft.stage = 'documents';
   state.registrationStep = 'documents';
   ensureUser();
   saveState();
   renderRegistration();
   showToast('Business details saved. Next: document readiness.');
+}
+
+function handleNameCheck() {
+  const form = document.querySelector('#business-form');
+  const input = document.querySelector('#business-name');
+  const details = form ? readBusinessDetails(form) : { businessName: normalizeBusinessName(input?.value || '') };
+  const result = checkBusinessNameAvailability(details.businessName);
+  updateBusinessDraft(details, result);
+  saveState();
+  renderRegistration();
+  document.querySelector('#business-name')?.focus();
 }
 
 function handleDocumentSubmit() {
@@ -684,16 +1056,28 @@ function handleDocumentSubmit() {
 
   state.draft.stage = 'payment';
   state.registrationStep = 'payment';
+  addNotification('Documents passed the demo check', 'Both uploaded files are ready for the sandbox payment step.', 'success');
   saveState();
   renderRegistration();
   showToast('Documents checked. Review the filing step.');
 }
 
-function handlePaymentSubmit() {
+function handlePaymentSubmit(outcome = 'success') {
   ensureUser();
+  if (outcome === 'failed') {
+    state.draft.payment = 'failed';
+    state.draft.paymentError = 'The sandbox declined this demo attempt. Choose Pay & queue application to retry.';
+    addNotification('Payment needs another try', 'The simulated payment was declined. Your application is still saved.', 'warning');
+    saveState();
+    renderRegistration();
+    showToast('Sandbox payment declined. You can retry.');
+    return;
+  }
   state.draft.payment = 'paid';
+  state.draft.paymentError = '';
   state.draft.stage = 'verifying';
   state.registrationStep = 'data';
+  addNotification('Verification started', 'Your mock payment was accepted and the application is now in verification.', 'success');
   saveState();
   navigate('dashboard');
   showToast('Mock payment confirmed. Your application is now verifying.');
@@ -713,6 +1097,7 @@ function handleLoginSubmit(form) {
   }
 
   state.user = { email, name: titleCase(email) };
+  seedDemoNotifications();
   saveState();
   navigate('dashboard');
   showToast('Welcome back. Your workspace is ready.');
@@ -752,6 +1137,7 @@ function togglePasswordVisibility() {
 function handleDemoLogin() {
   state.user = { email: 'ayo@regulai.demo', name: 'Ayo Olatunji' };
   if (!state.draft) state.draft = createRegistrationDraft({ businessName: 'Ayo’s Table', language: state.language });
+  seedDemoNotifications();
   saveState();
   navigate('dashboard');
   showToast('Demo account opened.');
@@ -781,11 +1167,14 @@ function handleClick(event) {
 
   const suggestion = event.target.closest('[data-suggested-name]');
   if (suggestion) {
-    const input = document.querySelector('#business-name');
-    if (input) {
-      input.value = suggestion.dataset.suggestedName;
-      input.focus();
-    }
+    const suggestedName = normalizeBusinessName(suggestion.dataset.suggestedName);
+    const form = document.querySelector('#business-form');
+    const details = form ? readBusinessDetails(form) : { businessName: suggestedName };
+    details.businessName = suggestedName;
+    updateBusinessDraft(details, checkBusinessNameAvailability(suggestedName));
+    saveState();
+    renderRegistration();
+    document.querySelector('#business-name')?.focus();
     return;
   }
 
@@ -795,6 +1184,11 @@ function handleClick(event) {
 
   if (action === 'mock-upload') {
     applyDocumentFile(actionButton.dataset.document, demoDocumentFiles[actionButton.dataset.document]);
+    return;
+  }
+
+  if (action === 'check-name') {
+    handleNameCheck();
     return;
   }
 
@@ -815,6 +1209,14 @@ function handleClick(event) {
   }
   if (action === 'close-timeline') {
     closeApplicationTimeline();
+    return;
+  }
+  if (action === 'notifications') {
+    showNotifications(actionButton);
+    return;
+  }
+  if (action === 'close-notifications') {
+    closeNotifications();
     return;
   }
   if (action === 'open-registration-guide') {
@@ -841,12 +1243,21 @@ function handleClick(event) {
     showBrandPreview(actionButton);
     return;
   }
+  if (action === 'open-brand-output') {
+    showBrandPreview(actionButton, actionButton.dataset.brandOutput || 'logo');
+    return;
+  }
   if (action === 'close-brand-preview') {
     closeBrandPreview();
     return;
   }
   if (action === 'select-brand-theme') {
     brandPreviewThemeId = actionButton.dataset.brandTheme || 'meadow';
+    renderBrandPreview();
+    return;
+  }
+  if (action === 'select-brand-output') {
+    brandPreviewOutput = actionButton.dataset.brandOutput || 'logo';
     renderBrandPreview();
     return;
   }
@@ -858,7 +1269,12 @@ function handleClick(event) {
     copyBrandProfile();
     return;
   }
-  if (action === 'notifications') showToast('You’re all caught up.');
+  if (action === 'download-certificate') downloadCertificate();
+  if (action === 'download-brand-profile') downloadBrandProfile();
+  if (action === 'download-brand-landing') downloadBrandLandingPage();
+  if (action === 'advance-status') advanceDemoStatus();
+  if (action === 'admin-request-resubmission') adminRequestResubmission();
+  if (action === 'admin-mark-resubmitted') adminMarkResubmitted();
   if (action === 'forgot-password') showToast('Password reset is mocked for this prototype.');
   if (action === 'terms') showToast('Terms are represented as prototype copy.');
   if (action === 'privacy') showToast('Privacy policy is represented as prototype copy.');
@@ -870,7 +1286,7 @@ function handleSubmit(event) {
   if (event.target.id === 'login-form') handleLoginSubmit(event.target);
   if (event.target.id === 'business-form') handleBusinessSubmit(event.target);
   if (event.target.id === 'document-form') handleDocumentSubmit();
-  if (event.target.id === 'payment-form') handlePaymentSubmit();
+  if (event.target.id === 'payment-form') handlePaymentSubmit(event.submitter?.value || 'success');
   if (event.target.id === 'chat-form') handleChatSubmit(event.target);
 }
 
@@ -903,6 +1319,7 @@ function handleKeydown(event) {
   }
   if (event.key !== 'Escape') return;
   if (timelineModal && !timelineModal.hidden) closeApplicationTimeline();
+  if (notificationsModal && !notificationsModal.hidden) closeNotifications();
   if (brandModal && !brandModal.hidden) closeBrandPreview();
   if (guideModal && !guideModal.hidden) closeRegistrationGuide();
   if (accountPopover && !accountPopover.hidden) closeAccountMenu();
