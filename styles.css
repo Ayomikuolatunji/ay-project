@@ -630,6 +630,8 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .review-item strong { display: block; color: var(--ink); font-size: 12px; }
 
+.review-item-wide { grid-column: 1 / -1; }
+
 .payment-summary { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 16px; border: 1px solid var(--line); border-radius: 11px; background: var(--deep); color: #edf4e9; }
 
 .payment-summary span { display: block; color: #9db0a5; font-size: 9px; }

@@ -3,6 +3,7 @@ import {
   getRegistrationProgress,
   isValidEmail,
   normalizeBusinessName,
+  validateRegistrationDetails,
 } from './app-core.js';
 
 const STORAGE_KEY = 'regulai-client-prototype-v1';
@@ -167,20 +168,22 @@ function renderRegistration() {
 
 function renderBusinessStep() {
   const draft = state.draft || {};
+  const businessType = draft.businessType || 'Business Name';
   return `<div class="flow-stage-heading">
     <div class="eyebrow">Step 1 of 3 · Business details</div>
     <h1>Tell us about the business you’re building.</h1>
     <p>You don’t need to know the official language. Start with the idea in your own words and we’ll help shape the application.</p>
   </div>
   <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />Welcome. What kind of business are you bringing to life?</p></div>
-  <form class="flow-form-card" id="business-form">
+  <form class="flow-form-card" id="business-form" novalidate>
     <div class="form-grid">
       <label class="form-field"><span>Business name or idea</span><input id="business-name" name="businessName" type="text" value="${escapeHtml(draft.businessName || '')}" placeholder="e.g. Ayo’s Table" required maxlength="70" /></label>
-      <label class="form-field"><span>Business type</span><select name="businessType"><option>Business Name</option><option>Limited Company (Ltd)</option><option>Incorporated Trustee</option></select></label>
+      <label class="form-field"><span>Business type</span><select id="business-type" name="businessType"><option${businessType === 'Business Name' ? ' selected' : ''}>Business Name</option><option${businessType === 'Limited Company (Ltd)' ? ' selected' : ''}>Limited Company (Ltd)</option><option${businessType === 'Incorporated Trustee' ? ' selected' : ''}>Incorporated Trustee</option></select></label>
     </div>
     <div class="eyebrow" style="margin-top: 1px;">Need inspiration?</div>
     <div class="suggestion-row"><button type="button" data-suggested-name="Ayo’s Table">Ayo’s Table</button><button type="button" data-suggested-name="Lush &amp; Local">Lush &amp; Local</button><button type="button" data-suggested-name="Northstar Repairs">Northstar Repairs</button></div>
-    <label class="form-field"><span>What does the business do?</span><textarea name="description" rows="3" placeholder="Tell us what you sell, make, or help people do."></textarea></label>
+    <label class="form-field"><span>What does the business do?</span><textarea name="description" rows="3" placeholder="Tell us what you sell, make, or help people do.">${escapeHtml(draft.description || '')}</textarea></label>
+    <p class="form-error" id="business-error" role="alert"></p>
     <div class="flow-form-actions"><span class="flow-note"><span>✦</span> You can change these details later.</span><button class="button button-dark" type="submit">Continue to documents <span aria-hidden="true">↗</span></button></div>
   </form>`;
 }
@@ -218,7 +221,7 @@ function renderPaymentStep() {
   </div>
   <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />Everything looks ready. Once payment is confirmed, your application moves to the verification queue.</p></div>
   <form class="flow-form-card" id="payment-form">
-    <div class="review-grid"><div class="review-item"><span>Business name</span><strong>${escapeHtml(draft.businessName || 'Your business')}</strong></div><div class="review-item"><span>Registration type</span><strong>Business Name</strong></div><div class="review-item"><span>Documents</span><strong>2 files · quality checked</strong></div><div class="review-item"><span>Preferred language</span><strong>${languageLabel(state.language)}</strong></div></div>
+    <div class="review-grid"><div class="review-item"><span>Business name</span><strong>${escapeHtml(draft.businessName || 'Your business')}</strong></div><div class="review-item"><span>Registration type</span><strong>${escapeHtml(draft.businessType || 'Business Name')}</strong></div><div class="review-item review-item-wide"><span>What the business does</span><strong>${escapeHtml(draft.description || 'Description to be confirmed')}</strong></div><div class="review-item"><span>Documents</span><strong>2 files · quality checked</strong></div><div class="review-item"><span>Preferred language</span><strong>${languageLabel(state.language)}</strong></div></div>
     <div class="payment-summary"><div><span>Mock filing fee</span><strong>₦25,000</strong></div><small>Government charges included<br />Sandbox payment</small></div>
     <div class="flow-form-actions"><button class="button button-quiet" type="button" data-action="previous-step">← Back</button><button class="button button-dark" type="submit">Pay &amp; queue application <span aria-hidden="true">↗</span></button></div>
   </form>`;
@@ -244,6 +247,7 @@ function renderDashboard() {
   document.querySelector('#dashboard-user-name').textContent = userName;
   document.querySelector('#dashboard-first-name').textContent = userName.split(' ')[0];
   document.querySelector('#dashboard-business-name').textContent = displayName;
+  document.querySelector('#dashboard-registration-type').textContent = `${draft?.businessType || 'Business Name'} registration · Started today`;
   document.querySelector('#dashboard-progress-number').textContent = `${progress}%`;
   document.querySelector('#dashboard-progress-bar').style.width = `${progress}%`;
   document.querySelector('#status-tracker').innerHTML = trackerSteps.map((item, index) => {
@@ -265,14 +269,17 @@ function ensureUser() {
 function handleBusinessSubmit(form) {
   const data = new FormData(form);
   const businessName = normalizeBusinessName(data.get('businessName'));
-  if (!businessName) {
-    setError('#business-name', '');
-    document.querySelector('#business-name')?.focus();
-    showToast('Add a business name or idea to continue.');
+  const businessType = String(data.get('businessType') || '');
+  const description = String(data.get('description') || '').trim();
+  const errors = validateRegistrationDetails({ businessName, businessType });
+  if (Object.keys(errors).length > 0) {
+    setError('#business-error', Object.values(errors)[0]);
+    document.querySelector(errors.businessName ? '#business-name' : '#business-type')?.focus();
+    showToast(Object.values(errors)[0]);
     return;
   }
 
-  state.draft = createRegistrationDraft({ businessName, language: state.language });
+  state.draft = createRegistrationDraft({ businessName, businessType, description, language: state.language });
   state.registrationStep = 'documents';
   ensureUser();
   saveState();
@@ -296,6 +303,7 @@ function handleDocumentSubmit() {
 
 function handlePaymentSubmit() {
   ensureUser();
+  state.draft.payment = 'paid';
   state.draft.stage = 'verifying';
   state.registrationStep = 'data';
   saveState();

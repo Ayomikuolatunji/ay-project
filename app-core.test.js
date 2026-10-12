@@ -6,6 +6,7 @@ import {
   getRegistrationProgress,
   isValidEmail,
   normalizeBusinessName,
+  validateRegistrationDetails,
 } from './app-core.js';
 
 test('normalizes a business name for consistent mock registration data', () => {
@@ -19,13 +20,29 @@ test('validates the email used to enter the client portal', () => {
   assert.equal(isValidEmail(''), false);
 });
 
-test('creates a registration draft with safe defaults', () => {
-  const draft = createRegistrationDraft({ businessName: ' Ayo Foods ' });
+test('creates a registration draft with the details needed for review', () => {
+  const draft = createRegistrationDraft({
+    businessName: ' Ayo Foods ',
+    businessType: 'Limited Company (Ltd)',
+    description: 'A neighbourhood food business',
+  });
 
   assert.equal(draft.businessName, 'Ayo Foods');
+  assert.equal(draft.businessType, 'Limited Company (Ltd)');
+  assert.equal(draft.description, 'A neighbourhood food business');
   assert.equal(draft.language, 'en');
   assert.equal(draft.stage, 'data');
   assert.match(draft.id, /^reg-/);
+});
+
+test('validates the minimum business details before the wizard advances', () => {
+  assert.deepEqual(validateRegistrationDetails({ businessName: '', businessType: 'Business Name' }), {
+    businessName: 'Add a business name or idea to continue.',
+  });
+  assert.deepEqual(validateRegistrationDetails({ businessName: 'Ayo Foods', businessType: 'Unknown' }), {
+    businessType: 'Choose a valid registration type to continue.',
+  });
+  assert.deepEqual(validateRegistrationDetails({ businessName: 'Ayo Foods', businessType: 'Business Name' }), {});
 });
 
 test('reports the guided registration progress by stage', () => {
