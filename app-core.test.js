@@ -5,6 +5,7 @@ import {
   createRegistrationDraft,
   getRegistrationProgress,
   getRegulAIReply,
+  validateDocumentFile,
   isValidEmail,
   normalizeBusinessName,
   validateRegistrationDetails,
@@ -58,4 +59,25 @@ test('returns grounded guidance for the dashboard assistant topics', () => {
   assert.match(getRegulAIReply('How long does registration take?'), /dashboard shows each stage/i);
   assert.match(getRegulAIReply('How much is payment?'), /₦25,000 sandbox filing fee/i);
   assert.match(getRegulAIReply('hello'), /documents, timing, payment, or your current application status/i);
+});
+
+test('checks document type and size before marking a file ready', () => {
+  assert.deepEqual(validateDocumentFile({
+    documentType: 'identity',
+    name: 'national-id.pdf',
+    mimeType: 'application/pdf',
+    size: 1_200_000,
+  }), { valid: true, message: 'File looks ready.' });
+  assert.deepEqual(validateDocumentFile({
+    documentType: 'passport',
+    name: 'passport.pdf',
+    mimeType: 'application/pdf',
+    size: 400_000,
+  }), { valid: false, message: 'Use a JPG or PNG image for the passport photograph.' });
+  assert.deepEqual(validateDocumentFile({
+    documentType: 'identity',
+    name: 'large-id.jpg',
+    mimeType: 'image/jpeg',
+    size: 6_000_000,
+  }), { valid: false, message: 'Keep each document under 5 MB.' });
 });

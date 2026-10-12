@@ -602,6 +602,8 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .document-row { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 
+.document-row.has-error { border-color: rgba(199, 94, 74, .45); }
+
 .document-icon { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: var(--lavender); color: var(--purple); font-size: 15px; }
 
 .document-copy { min-width: 0; margin-right: auto; }
@@ -614,13 +616,27 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .document-status.is-passed { color: var(--lime-dark); }
 
+.document-status.is-failed { color: #c75e4a; }
+
 .document-status i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
 
 .document-status.is-passed i { background: var(--lime-dark); }
 
-.upload-button { padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--white); color: var(--ink-soft); font-size: 9px; font-weight: 700; }
+.document-status.is-failed i { background: #c75e4a; }
+
+.document-error { display: block; margin-top: 5px; color: #c75e4a; font-size: 9px; line-height: 1.35; }
+
+.document-actions { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+
+.document-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+
+.upload-button { display: inline-flex; align-items: center; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--white); color: var(--ink-soft); font-size: 9px; font-weight: 700; cursor: pointer; }
 
 .upload-button:hover { border-color: var(--purple); color: var(--purple); }
+
+.demo-file-button { padding: 7px 3px; background: transparent; color: var(--purple); font-size: 9px; font-weight: 750; }
+
+.demo-file-button:hover { color: var(--orange); }
 
 .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
 
@@ -910,7 +926,7 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
   .flow-note { order: 2; text-align: center; }
   .document-row { flex-wrap: wrap; }
   .document-status { margin-left: 46px; }
-  .upload-button { margin-left: auto; }
+  .document-actions { width: 100%; margin-left: 46px; justify-content: flex-end; }
   .dashboard-shell { display: block; }
   .dashboard-sidebar { display: none; }
   .dashboard-topbar { min-height: 75px; padding: 0 16px; }

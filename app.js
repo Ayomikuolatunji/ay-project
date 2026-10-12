@@ -4,6 +4,7 @@ import {
   getRegulAIReply,
   isValidEmail,
   normalizeBusinessName,
+  validateDocumentFile,
   validateRegistrationDetails,
 } from './app-core.js';
 
@@ -250,26 +251,80 @@ function renderBusinessStep() {
 
 function renderDocumentsStep() {
   const draft = state.draft || createRegistrationDraft();
-  const identityPassed = draft.documents?.identity === 'passed';
-  const passportPassed = draft.documents?.passport === 'passed';
+  const documents = draft.documents || {};
+  const documentFiles = draft.documentFiles || {};
+  const documentErrors = draft.documentErrors || {};
   return `<div class="flow-stage-heading">
     <div class="eyebrow">Step 2 of 3 · Document check</div>
     <h1>Let’s make sure your documents are ready.</h1>
     <p>Upload clear copies of the documents needed for your Business Name application. This prototype checks quality and completeness before the next step.</p>
   </div>
-  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />A clear document now means less back-and-forth later. You can use the mock upload buttons for this demo.</p></div>
+  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />A clear document now means less back-and-forth later. Choose a file or use a demo file for this prototype.</p></div>
   <form class="flow-form-card" id="document-form">
     <div class="document-list">
-      ${renderDocumentRow('identity', '▤', 'Government-issued identity document', 'National ID, driver’s licence, or international passport', identityPassed)}
-      ${renderDocumentRow('passport', '◉', 'Passport photograph', 'A recent, clear photo with a plain background', passportPassed)}
+      ${renderDocumentRow('identity', '▤', 'Government-issued identity document', 'National ID, driver’s licence, or international passport', documents.identity, documentFiles.identity, documentErrors.identity, 'application/pdf,image/jpeg,image/png')}
+      ${renderDocumentRow('passport', '◉', 'Passport photograph', 'A recent, clear photo with a plain background', documents.passport, documentFiles.passport, documentErrors.passport, 'image/jpeg,image/png')}
     </div>
     <p class="form-error" id="document-error" role="alert"></p>
     <div class="flow-form-actions"><button class="button button-quiet" type="button" data-action="previous-step">← Back</button><button class="button button-dark" type="submit">Review application <span aria-hidden="true">↗</span></button></div>
   </form>`;
 }
 
-function renderDocumentRow(id, icon, title, description, passed) {
-  return `<div class="document-row"><span class="document-icon" aria-hidden="true">${icon}</span><div class="document-copy"><strong>${title}</strong><span>${description}</span></div><span class="document-status ${passed ? 'is-passed' : ''}"><i></i>${passed ? 'Ready' : 'Pending'}</span><button class="upload-button" type="button" data-action="mock-upload" data-document="${id}">${passed ? 'Replace' : 'Use mock file'}</button></div>`;
+function renderDocumentRow(id, icon, title, description, status = 'pending', file = null, error = '', accept = '') {
+  const passed = status === 'passed';
+  const failed = status === 'failed';
+  const statusLabel = passed ? 'Ready' : failed ? 'Needs attention' : 'Pending';
+  const fileLabel = file?.name
+    ? `${escapeHtml(file.name)}${Number(file.size) > 0 ? ` · ${formatFileSize(file.size)}` : ''}`
+    : escapeHtml(description);
+  return `<div class="document-row ${failed ? 'has-error' : ''}">
+    <span class="document-icon" aria-hidden="true">${icon}</span>
+    <div class="document-copy"><strong>${title}</strong><span>${fileLabel}</span>${error ? `<small class="document-error" role="alert">${escapeHtml(error)}</small>` : ''}</div>
+    <span class="document-status ${passed ? 'is-passed' : ''} ${failed ? 'is-failed' : ''}"><i></i>${statusLabel}</span>
+    <div class="document-actions"><label class="upload-button" for="${id}-file">${file ? 'Replace file' : 'Choose file'}</label><input class="document-file-input" id="${id}-file" type="file" data-document-input="${id}" accept="${accept}" /><button class="demo-file-button" type="button" data-action="mock-upload" data-document="${id}">Use demo file</button></div>
+  </div>`;
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes);
+  if (!Number.isFinite(size) || size <= 0) return '';
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function ensureDocumentState() {
+  if (!state.draft) state.draft = createRegistrationDraft();
+  state.draft.documents ||= {};
+  state.draft.documents.identity ||= 'pending';
+  state.draft.documents.passport ||= 'pending';
+  state.draft.documentFiles ||= {};
+  state.draft.documentFiles.identity ??= null;
+  state.draft.documentFiles.passport ??= null;
+  state.draft.documentErrors ||= {};
+  state.draft.documentErrors.identity ??= '';
+  state.draft.documentErrors.passport ??= '';
+}
+
+const demoDocumentFiles = {
+  identity: { name: 'ayo-identity.pdf', mimeType: 'application/pdf', size: 1_200_000 },
+  passport: { name: 'ayo-passport.jpg', mimeType: 'image/jpeg', size: 850_000 },
+};
+
+function applyDocumentFile(documentType, file) {
+  ensureUser();
+  ensureDocumentState();
+  const metadata = {
+    name: String(file?.name || ''),
+    mimeType: String(file?.type || file?.mimeType || ''),
+    size: Number(file?.size) || 0,
+  };
+  const result = validateDocumentFile({ documentType, ...metadata });
+  state.draft.documentFiles[documentType] = metadata;
+  state.draft.documents[documentType] = result.valid ? 'passed' : 'failed';
+  state.draft.documentErrors[documentType] = result.valid ? '' : result.message;
+  saveState();
+  renderRegistration();
+  showToast(result.valid ? `${metadata.name} checked and marked ready.` : result.message);
 }
 
 function renderPaymentStep() {
@@ -352,7 +407,7 @@ function handleBusinessSubmit(form) {
 function handleDocumentSubmit() {
   const documents = state.draft?.documents || {};
   if (documents.identity !== 'passed' || documents.passport !== 'passed') {
-    setError('#document-error', 'Use the mock upload buttons for both documents before continuing.');
+    setError('#document-error', 'Choose a valid file or use a demo file for both documents before continuing.');
     return;
   }
 
@@ -464,12 +519,8 @@ function handleClick(event) {
   const action = actionButton.dataset.action;
 
   if (action === 'mock-upload') {
-    ensureUser();
-    if (!state.draft) state.draft = createRegistrationDraft();
-    state.draft.documents[actionButton.dataset.document] = 'passed';
-    saveState();
-    renderRegistration();
-    showToast('Mock document checked and marked ready.');
+    applyDocumentFile(actionButton.dataset.document, demoDocumentFiles[actionButton.dataset.document]);
+    return;
   }
 
   if (action === 'previous-step') {
@@ -502,6 +553,11 @@ function handleSubmit(event) {
 }
 
 function handleChange(event) {
+  if (event.target.matches('[data-document-input]')) {
+    const file = event.target.files?.[0];
+    if (file) applyDocumentFile(event.target.dataset.documentInput, file);
+    return;
+  }
   if (!event.target.matches('[data-language-select]')) return;
   state.language = event.target.value;
   if (state.draft) state.draft.language = state.language;

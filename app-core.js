@@ -23,8 +23,48 @@ export function createRegistrationDraft({
       identity: 'pending',
       passport: 'pending',
     },
+    documentFiles: {
+      identity: null,
+      passport: null,
+    },
+    documentErrors: {
+      identity: '',
+      passport: '',
+    },
     payment: 'pending',
   };
+}
+
+export function validateDocumentFile({
+  documentType = 'identity',
+  name = '',
+  mimeType = '',
+  size = 0,
+} = {}) {
+  const normalizedName = String(name ?? '').toLowerCase();
+  const normalizedMimeType = String(mimeType ?? '').toLowerCase();
+  const isPassport = documentType === 'passport';
+  const allowedMimeTypes = isPassport
+    ? new Set(['image/jpeg', 'image/png'])
+    : new Set(['application/pdf', 'image/jpeg', 'image/png']);
+  const allowedExtensions = isPassport ? /\.(jpe?g|png)$/ : /\.(pdf|jpe?g|png)$/;
+
+  if (!name || !allowedMimeTypes.has(normalizedMimeType) || !allowedExtensions.test(normalizedName)) {
+    return {
+      valid: false,
+      message: isPassport
+        ? 'Use a JPG or PNG image for the passport photograph.'
+        : 'Use a PDF, JPG, or PNG file for the identity document.',
+    };
+  }
+  if (!Number.isFinite(size) || size <= 0) {
+    return { valid: false, message: 'Choose a non-empty file before continuing.' };
+  }
+  if (size > 5 * 1024 * 1024) {
+    return { valid: false, message: 'Keep each document under 5 MB.' };
+  }
+
+  return { valid: true, message: 'File looks ready.' };
 }
 
 export function validateRegistrationDetails({ businessName = '', businessType = '' } = {}) {
