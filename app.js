@@ -320,6 +320,33 @@ function syncAccountMenuState(open) {
   });
 }
 
+function trapAccountMenuFocus(event) {
+  if (!accountPopover || accountPopover.hidden || event.key !== 'Tab') return;
+
+  const focusable = [...accountPopover.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((element) => !element.disabled && element.getClientRects().length > 0);
+  if (!focusable.length) {
+    event.preventDefault();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!accountPopover.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return;
+  }
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 function resetDemo() {
   if (!window.confirm('Restart the demo and clear this browser’s saved application?')) return;
   const language = state.language || defaultState.language;
@@ -860,6 +887,10 @@ function handleHashChange() {
 }
 
 function handleKeydown(event) {
+  if (event.key === 'Tab') {
+    trapAccountMenuFocus(event);
+    return;
+  }
   if (event.key !== 'Escape') return;
   if (timelineModal && !timelineModal.hidden) closeApplicationTimeline();
   if (brandModal && !brandModal.hidden) closeBrandPreview();
