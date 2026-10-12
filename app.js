@@ -2,6 +2,7 @@ import {
   createBrandKit,
   createRegistrationDraft,
   getApplicationTimeline,
+  getLocalizedCopy,
   getRegistrationProgress,
   getRegulAIReply,
   isValidEmail,
@@ -225,6 +226,7 @@ function copyBrandProfile() {
 }
 
 function renderApplicationTimeline() {
+  const copy = getLocalizedCopy(state.language);
   const timeline = getApplicationTimeline(trackerStage(state.draft?.stage || 'data'));
   const current = timeline.find((item) => item.status === 'current') || timeline[0];
   const currentLabel = document.querySelector('#timeline-current-label');
@@ -232,11 +234,11 @@ function renderApplicationTimeline() {
   const list = document.querySelector('#timeline-list');
   if (!currentLabel || !currentNote || !list) return;
 
-  currentLabel.textContent = current.label;
+  currentLabel.textContent = copy.tracker[current.id] || current.label;
   currentNote.textContent = current.note;
   list.innerHTML = timeline.map((item, index) => `<div class="timeline-item is-${item.status}">
     <span class="timeline-marker">${item.status === 'complete' ? '✓' : index + 1}</span>
-    <div class="timeline-item-copy"><div><strong>${escapeHtml(item.label)}</strong><span>${item.status === 'current' ? 'Current stage' : item.status === 'complete' ? 'Complete' : 'Up next'}</span></div><p>${escapeHtml(item.note)}</p></div>
+    <div class="timeline-item-copy"><div><strong>${escapeHtml(copy.tracker[item.id] || item.label)}</strong><span>${escapeHtml(copy.timeline[item.status])}</span></div><p>${escapeHtml(item.note)}</p></div>
   </div>`).join('');
 }
 
@@ -330,13 +332,14 @@ function navigate(route, updateHash = true) {
 function renderFlowSteps() {
   const activeIndex = registrationSteps.findIndex((step) => step.id === state.registrationStep);
   const flowSteps = document.querySelector('#flow-steps');
+  const copy = getLocalizedCopy(state.language);
 
   flowSteps.innerHTML = registrationSteps.map((step, index) => {
     const isDone = index < activeIndex;
     const isActive = index === activeIndex;
     return `<div class="flow-step ${isDone ? 'is-done' : ''} ${isActive ? 'is-active' : ''}">
       <span class="flow-step-marker">${isDone ? '✓' : index + 1}</span>
-      <span>${step.label}</span>
+      <span>${copy.steps[step.id] || step.label}</span>
     </div>`;
   }).join('');
 }
@@ -481,23 +484,48 @@ function trackerStage(stage) {
 
 function renderDashboard() {
   const draft = state.draft;
+  const copy = getLocalizedCopy(state.language);
   const displayName = draft?.businessName || 'No registration started';
   const stage = trackerStage(draft?.stage || 'data');
   const timeline = getApplicationTimeline(stage);
   const progress = draft ? getRegistrationProgress(draft.stage) : 0;
   const userName = state.user?.name || 'Ayo Olatunji';
 
-  document.querySelector('#dashboard-user-name').textContent = userName;
-  document.querySelector('#dashboard-first-name').textContent = userName.split(' ')[0];
-  document.querySelector('#dashboard-chat-greeting').textContent = `Hi ${userName.split(' ')[0]}. What would you like to make clearer today?`;
-  document.querySelector('#dashboard-business-name').textContent = displayName;
-  document.querySelector('#dashboard-registration-type').textContent = `${draft?.businessType || 'Business Name'} registration · Started today`;
-  document.querySelector('#dashboard-progress-number').textContent = `${progress}%`;
-  document.querySelector('#dashboard-progress-bar').style.width = `${progress}%`;
+  setText('#dashboard-user-name', userName);
+  setText('#dashboard-first-name', userName.split(' ')[0]);
+  setText('#dashboard-chat-greeting', `Hi ${userName.split(' ')[0]}. What would you like to make clearer today?`);
+  setText('#dashboard-business-name', displayName);
+  setText('#dashboard-registration-type', `${draft?.businessType || 'Business Name'} registration · Started today`);
+  setText('#dashboard-progress-number', `${progress}%`);
+  setText('#dashboard-breadcrumb', copy.dashboard.breadcrumb);
+  setText('#dashboard-greeting-label', copy.dashboard.greeting);
+  setText('#dashboard-progress-eyebrow', copy.dashboard.progressEyebrow);
+  setText('#dashboard-heading', copy.dashboard.heading);
+  setText('#dashboard-subheading', copy.dashboard.subheading);
+  setText('#dashboard-continue-label', copy.dashboard.continueRegistration);
+  setText('#dashboard-status-label', copy.dashboard.applicationInProgress);
+  setText('#dashboard-current-progress-label', copy.dashboard.currentProgress);
+  setText('#dashboard-timeline-label', copy.dashboard.viewTimeline);
+  setText('#dashboard-chat-eyebrow', copy.dashboard.alwaysAvailable);
+  setText('#dashboard-chat-title', copy.dashboard.askRegulai);
+  setText('#dashboard-online-label', copy.dashboard.online);
+  setText('#dashboard-brand-eyebrow', copy.dashboard.afterRegistration);
+  setText('#dashboard-brand-title', copy.dashboard.brandKit);
+  setText('#dashboard-brand-preview-label', copy.dashboard.preview);
+  setText('#dashboard-start-chat-label', copy.dashboard.startConversation);
+  const progressBar = document.querySelector('#dashboard-progress-bar');
+  if (progressBar) progressBar.style.width = `${progress}%`;
+  const quickQuestions = document.querySelectorAll('.quick-question');
+  const quickQuestionCopy = [copy.dashboard.quickDocuments, copy.dashboard.quickTiming];
+  quickQuestions.forEach((question, index) => {
+    const label = question.querySelector('[data-quick-question-label]');
+    const localizedQuestion = quickQuestionCopy[index] || question.dataset.chatQuestion;
+    if (label) label.textContent = localizedQuestion;
+  });
   document.querySelector('#status-tracker').innerHTML = timeline.map((item, index) => {
     const done = item.status === 'complete';
     const active = item.status === 'current';
-    return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span>${item.label}</span></div>`;
+    return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span>${copy.tracker[item.id] || item.label}</span></div>`;
   }).join('');
   renderDashboardBrandKit();
   resetGuideChat();
@@ -506,6 +534,11 @@ function renderDashboard() {
 function setError(selector, message) {
   const element = document.querySelector(selector);
   if (element) element.textContent = message;
+}
+
+function setText(selector, value) {
+  const element = document.querySelector(selector);
+  if (element) element.textContent = value;
 }
 
 function ensureUser() {
@@ -720,6 +753,9 @@ function handleChange(event) {
   if (state.draft) state.draft.language = state.language;
   saveState();
   syncLanguageControls();
+  const activeScreen = document.querySelector('.screen.is-active')?.dataset.screen;
+  if (activeScreen === 'register') renderRegistration();
+  if (activeScreen === 'dashboard') renderDashboard();
   showToast(`Language set to ${languageLabel(state.language)}.`);
 }
 

@@ -6,6 +6,7 @@ import {
   createBrandKit,
   getRegistrationProgress,
   getApplicationTimeline,
+  getLocalizedCopy,
   getRegulAIReply,
   validateDocumentFile,
   isValidEmail,
@@ -70,6 +71,16 @@ test('derives the application timeline state from the current stage', () => {
   assert.equal(timeline[2].label, 'Verifying');
   assert.match(timeline[2].note, /document check/i);
   assert.equal(getApplicationTimeline('unknown')[0].status, 'current');
+});
+
+test('returns localized workspace copy with a safe English fallback', () => {
+  const yoruba = getLocalizedCopy('yo');
+  const english = getLocalizedCopy('en');
+
+  assert.equal(yoruba.dashboard.continueRegistration, 'Tẹ̀síwájú ìforúkọsílẹ̀');
+  assert.equal(yoruba.tracker.verifying, 'A ń ṣàyẹ̀wò');
+  assert.equal(yoruba.steps.documents, 'Àyẹ̀wò ìwé');
+  assert.equal(getLocalizedCopy('unknown').dashboard.heading, english.dashboard.heading);
 });
 
 test('returns grounded guidance for the dashboard assistant topics', () => {
