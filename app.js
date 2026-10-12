@@ -320,11 +320,15 @@ function syncAccountMenuState(open) {
   });
 }
 
-function trapAccountMenuFocus(event) {
-  if (!accountPopover || accountPopover.hidden || event.key !== 'Tab') return;
-
-  const focusable = [...accountPopover.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+function getFocusableElements(container) {
+  return [...container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
     .filter((element) => !element.disabled && element.getClientRects().length > 0);
+}
+
+function trapDialogFocus(container, event) {
+  if (!container || container.hidden || event.key !== 'Tab') return;
+
+  const focusable = getFocusableElements(container);
   if (!focusable.length) {
     event.preventDefault();
     return;
@@ -345,6 +349,12 @@ function trapAccountMenuFocus(event) {
     event.preventDefault();
     first.focus();
   }
+}
+
+function trapOpenDialogFocus(event) {
+  const openDialog = [accountPopover, brandModal, timelineModal, guideModal]
+    .find((dialog) => dialog && !dialog.hidden);
+  trapDialogFocus(openDialog, event);
 }
 
 function resetDemo() {
@@ -888,7 +898,7 @@ function handleHashChange() {
 
 function handleKeydown(event) {
   if (event.key === 'Tab') {
-    trapAccountMenuFocus(event);
+    trapOpenDialogFocus(event);
     return;
   }
   if (event.key !== 'Escape') return;
