@@ -18,10 +18,12 @@ This version is intentionally client-only and mock-heavy. It does not call the C
 ## Run locally
 
 ```bash
-npm start
+npm run dev
 ```
 
 Then open [http://localhost:4173](http://localhost:4173).
+
+`npm start` remains available as the production-style static preview command. Set `PORT` when another local server is already using 4173, for example `PORT=4174 npm run dev`.
 
 ## Verify
 

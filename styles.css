@@ -176,6 +176,7 @@ h3 { font-size: 21px; font-weight: 700; line-height: 1.08; }
 em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
 
 .public-nav {
+  position: relative;
   display: flex;
   min-height: 84px;
   align-items: center;
@@ -219,6 +220,8 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 .language-globe { font-size: 14px; line-height: 1; }
 
 .mobile-menu-button { display: none; padding: 5px; background: transparent; color: var(--ink); font-size: 21px; }
+
+.mobile-nav-panel { display: none; }
 
 .landing-hero {
   display: grid;
@@ -801,7 +804,16 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
   .desktop-nav-links, .nav-actions .language-control, .nav-signin { display: none; }
   .nav-actions { margin-left: auto; }
   .public-nav .nav-actions { margin-left: auto; }
+  .public-nav.menu-open { z-index: 10; }
   .mobile-menu-button { display: block; }
+  .mobile-nav-panel { position: absolute; z-index: 3; top: calc(100% - 1px); right: 0; left: 0; display: grid; gap: 18px; padding: 15px; border: 1px solid var(--line); border-radius: 0 0 14px 14px; background: var(--paper); box-shadow: var(--shadow); }
+  .mobile-nav-panel[hidden] { display: none; }
+  .mobile-nav-links { display: grid; gap: 2px; }
+  .mobile-nav-links button { padding: 12px 5px; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); font-size: 12px; font-weight: 680; text-align: left; }
+  .mobile-nav-links button:last-child { border-bottom: 0; }
+  .mobile-nav-actions { display: grid; grid-template-columns: auto auto; align-items: center; gap: 12px; padding-top: 2px; }
+  .mobile-nav-actions .language-control { justify-self: start; }
+  .mobile-nav-actions .button { grid-column: 1 / -1; width: 100%; }
   .landing-hero { min-height: auto; padding-top: 62px; padding-bottom: 58px; }
   h1 { font-size: clamp(42px, 13vw, 64px); }
   .hero-intro { font-size: 13px; }

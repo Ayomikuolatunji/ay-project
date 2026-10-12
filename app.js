@@ -32,6 +32,9 @@ let toastTimeout;
 
 const screens = [...document.querySelectorAll('[data-screen]')];
 const toast = document.querySelector('#toast');
+const publicNav = document.querySelector('.public-nav');
+const mobileMenuButton = document.querySelector('.mobile-menu-button');
+const mobileMenu = document.querySelector('[data-mobile-menu]');
 
 function loadState() {
   try {
@@ -69,6 +72,13 @@ function showToast(message) {
   toastTimeout = setTimeout(() => toast.classList.remove('is-visible'), 2600);
 }
 
+function setMobileMenu(open) {
+  publicNav?.classList.toggle('menu-open', open);
+  mobileMenuButton?.setAttribute('aria-expanded', String(open));
+  mobileMenuButton?.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+  if (mobileMenu) mobileMenu.hidden = !open;
+}
+
 function syncLanguageControls() {
   document.querySelectorAll('[data-language-select]').forEach((select) => {
     select.value = state.language;
@@ -77,6 +87,7 @@ function syncLanguageControls() {
 
 function navigate(route, updateHash = true) {
   const targetRoute = validRoutes.has(route) ? route : 'landing';
+  setMobileMenu(false);
 
   screens.forEach((screen) => {
     const isTarget = screen.dataset.screen === targetRoute;
@@ -298,6 +309,7 @@ function handleClick(event) {
   if (scrollButton) {
     const destination = document.getElementById(scrollButton.dataset.scroll);
     if (destination) destination.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setMobileMenu(false);
     return;
   }
 
@@ -339,7 +351,7 @@ function handleClick(event) {
   if (action === 'forgot-password') showToast('Password reset is mocked for this prototype.');
   if (action === 'terms') showToast('Terms are represented as prototype copy.');
   if (action === 'privacy') showToast('Privacy policy is represented as prototype copy.');
-  if (action === 'toggle-mobile-menu') document.querySelector('.public-nav')?.classList.toggle('menu-open');
+  if (action === 'toggle-mobile-menu') setMobileMenu(!publicNav?.classList.contains('menu-open'));
 }
 
 function handleSubmit(event) {
