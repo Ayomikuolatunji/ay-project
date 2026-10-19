@@ -23,7 +23,7 @@ import {
 const STORAGE_KEY = 'regulai-client-prototype-v1';
 const DEMO_STORAGE_KEY = `${STORAGE_KEY}-shareable`;
 const isShareableDemoRoute = new URLSearchParams(window.location.search).get('demo') === '1';
-const validRoutes = new Set(['landing', 'login', 'register', 'dashboard', 'compliance', 'admin']);
+const validRoutes = new Set(['landing', 'login', 'signup', 'register', 'dashboard', 'compliance', 'admin']);
 const dashboardViewActionMap = {
   'dashboard-overview': 'overview',
   'dashboard-applications': 'applications',
@@ -665,8 +665,52 @@ function syncLanguageControls() {
   });
 }
 
+function setButtonText(button, label) {
+  if (!button) return;
+  const textNode = [...button.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+  if (textNode) textNode.textContent = `${textNode.previousSibling?.nodeType === Node.ELEMENT_NODE ? ' ' : ''}${label} `;
+}
+
+function syncEntryFlowCopy() {
+  const landingLabels = {
+    'Start registration': 'Create account',
+    'Start your registration': 'Create your account',
+    'Meet your guide': 'Create your workspace',
+    'Prepare your documents': 'Create your workspace',
+    'Start with your idea': 'Create your workspace',
+    'Build your business foundation': 'Create your workspace',
+    'See the demo workspace': 'Create your workspace',
+  };
+  document.querySelectorAll('.landing-screen [data-route="register"]').forEach((button) => {
+    const currentLabel = button.textContent.trim().replace(/↗$/, '').trim();
+    button.dataset.route = 'signup';
+    if (landingLabels[currentLabel]) setButtonText(button, landingLabels[currentLabel]);
+  });
+
+  const loginScreen = document.querySelector('[data-screen="login"]');
+  if (loginScreen) {
+    const demoNote = loginScreen.querySelector('.demo-mode-note span');
+    if (demoNote) demoNote.textContent = 'Create an account to open your workspace. This demo does not use real authentication or payment.';
+    const intro = loginScreen.querySelector('.auth-form-content .form-intro');
+    if (intro) intro.textContent = 'Sign in to continue to your saved workspace.';
+    const demoButton = loginScreen.querySelector('[data-action="demo-login"]');
+    if (demoButton) setButtonText(demoButton, 'Use the demo account');
+    const accountButton = loginScreen.querySelector('.auth-switch button');
+    if (accountButton) {
+      accountButton.dataset.route = 'signup';
+      accountButton.textContent = 'Create an account';
+    }
+  }
+}
+
 function navigate(route, updateHash = true) {
   const targetRoute = validRoutes.has(route) ? route : 'landing';
+  if (targetRoute === 'register' && !state.user) {
+    if (window.location.hash !== '#signup') history.replaceState(null, '', '#signup');
+    navigate('signup', false);
+    showToast('Create an account before starting registration.');
+    return;
+  }
   if (['dashboard', 'compliance', 'admin'].includes(targetRoute) && !state.user) {
     if (window.location.hash !== '#login') history.replaceState(null, '', '#login');
     navigate('login', false);
@@ -1619,6 +1663,36 @@ function handleLoginSubmit(form) {
   showToast('Welcome back. Your workspace is ready.');
 }
 
+function handleSignupSubmit(form) {
+  const data = new FormData(form);
+  const name = String(data.get('name') || '').trim();
+  const email = String(data.get('email') || '').trim();
+  const password = String(data.get('password') || '');
+  if (name.length < 2) {
+    setError('#signup-error', 'Enter your name to create the demo workspace.');
+    document.querySelector('#signup-name')?.focus();
+    return;
+  }
+  if (!isValidEmail(email)) {
+    setError('#signup-error', 'Enter a valid email address to continue.');
+    document.querySelector('#signup-email')?.focus();
+    return;
+  }
+  if (password.length < 4) {
+    setError('#signup-error', 'Use a password with at least 4 characters for this demo.');
+    document.querySelector('#signup-password')?.focus();
+    return;
+  }
+
+  setError('#signup-error', '');
+  state.user = { email, name };
+  state.draft ||= createRegistrationDraft({ language: state.language });
+  seedDemoNotifications();
+  saveState();
+  navigate('dashboard');
+  showToast('Account created. Your workspace is ready.');
+}
+
 function resetLoginForm() {
   const form = document.querySelector('#login-form');
   const password = document.querySelector('#login-password');
@@ -1640,9 +1714,9 @@ function handleSignOut() {
   showToast('You’re signed out. Your application is saved.');
 }
 
-function togglePasswordVisibility() {
-  const password = document.querySelector('#login-password');
-  const toggle = document.querySelector('[data-action="toggle-password"]');
+function togglePasswordVisibility(trigger = null) {
+  const toggle = trigger || document.querySelector('[data-action="toggle-password"]');
+  const password = document.querySelector(`#${toggle?.getAttribute('aria-controls') || 'login-password'}`);
   if (!password || !toggle) return;
   const isVisible = password.type === 'text';
   password.type = isVisible ? 'password' : 'text';
@@ -1776,7 +1850,7 @@ function handleClick(event) {
 
   if (action === 'demo-login') handleDemoLogin();
   if (action === 'sign-out') handleSignOut();
-  if (action === 'toggle-password') togglePasswordVisibility();
+  if (action === 'toggle-password') togglePasswordVisibility(actionButton);
   if (action === 'open-chat') showGuideChat(actionButton.dataset.chatQuestion || '');
   if (action === 'open-timeline') {
     showApplicationTimeline(actionButton);
@@ -1859,6 +1933,7 @@ function handleClick(event) {
 function handleSubmit(event) {
   event.preventDefault();
   if (event.target.id === 'login-form') handleLoginSubmit(event.target);
+  if (event.target.id === 'signup-form') handleSignupSubmit(event.target);
   if (event.target.id === 'business-form') handleBusinessSubmit(event.target);
   if (event.target.id === 'document-form') handleDocumentSubmit();
   if (event.target.id === 'payment-form') handlePaymentSubmit(event.submitter?.value || 'success');
@@ -1922,5 +1997,6 @@ window.addEventListener('hashchange', handleHashChange);
 
 const initialRoute = window.location.hash.slice(1);
 applyShareableDemoAccess();
+syncEntryFlowCopy();
 observeLandingSections();
 navigate(validRoutes.has(initialRoute) ? initialRoute : 'landing', false);

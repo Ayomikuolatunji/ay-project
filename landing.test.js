@@ -55,11 +55,11 @@ test('new landing sections use semantic groups and working registration CTAs', (
 
   assert.match(founder, /aria-labelledby="founder-path-note-title"/);
   assert.match(founder, /id="founder-path-note-title"/);
-  assert.match(founder, /data-route="register"/);
+  assert.match(appSource, /'Start with your idea': 'Create your workspace'/);
   assert.match(documentConfidence, /aria-labelledby="readiness-preview-title"/);
   assert.match(documentConfidence, /id="readiness-preview-title"/);
   assert.match(businessReady, /class="business-ready-mark" aria-hidden="true"/);
-  assert.match(businessReady, /data-route="register"/);
+  assert.match(appSource, /'See the demo workspace': 'Create your workspace'/);
   assert.match(faq, /<details open>/);
 });
 
@@ -80,6 +80,21 @@ test('includes the report-required compliance workspace and full dashboard navig
   assert.match(appSource, /data-action="open-documents"/);
   assert.match(appSource, /data-route="compliance"/);
   assert.match(appSource, /data-action="dashboard-settings"/);
+});
+
+test('separates account creation from the registration workflow', () => {
+  assert.match(landingMarkup, /data-screen="signup"/);
+  assert.match(landingMarkup, /id="signup-form"/);
+  assert.match(appSource, /Create an account to open your workspace/);
+  assert.match(appSource, /'signup'/);
+  assert.match(appSource, /function handleSignupSubmit/);
+  assert.match(appSource, /targetRoute === 'register'/);
+  assert.match(appSource, /navigate\('signup'/);
+});
+
+test('keeps auth screens inside the viewport at tablet width', () => {
+  assert.match(landingStyles, /@media \(max-width: 1050px\)[\s\S]*\.auth-shell\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*\.75fr\)\s+minmax\(0,\s*1\.25fr\)/);
+  assert.match(landingStyles, /\/\* Auth and registration \*\/[\s\S]*\.auth-shell\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*\.78fr\)\s+minmax\(0,\s*1\.22fr\)/);
 });
 
 test('supports shareable client-only demo routes for user and admin review', () => {
