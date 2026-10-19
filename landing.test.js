@@ -93,8 +93,11 @@ test('supports shareable client-only demo routes for user and admin review', () 
 test('keeps the compliance form bounded and updates its live counter', () => {
   assert.match(landingMarkup, /id="compliance-description"[^>]*maxlength="500"/);
   assert.match(landingMarkup, /id="compliance-description-count"/);
+  assert.match(landingMarkup, /id="compliance-description-count"[^>]*aria-live="polite"/);
   assert.match(appSource, /function handleInput/);
   assert.match(appSource, /compliance-description-count/);
+  assert.match(appSource, /slice\(0,\s*500\)/);
+  assert.match(landingStyles, /\.form-error\s*\{[\s\S]*color:\s*var\(--color-error\)/);
 });
 
 test('keeps the dashboard usable on narrow screens', () => {

@@ -1173,7 +1173,9 @@ function renderCompliance() {
   const descriptionInput = document.querySelector('#compliance-description');
   const nameInput = document.querySelector('#compliance-business-name');
   const serviceInput = document.querySelector('#compliance-service-list');
-  if (descriptionInput && !descriptionInput.value) descriptionInput.value = analysis?.description || draft.description || '';
+  const maxDescriptionLength = Number(descriptionInput?.maxLength) || 500;
+  if (descriptionInput && !descriptionInput.value) descriptionInput.value = (analysis?.description || draft.description || '').slice(0, maxDescriptionLength);
+  if (descriptionInput && descriptionInput.value.length > maxDescriptionLength) descriptionInput.value = descriptionInput.value.slice(0, maxDescriptionLength);
   if (nameInput && !nameInput.value) nameInput.value = analysis?.businessName || draft.businessName || '';
   if (serviceInput && !serviceInput.value) serviceInput.value = analysis?.serviceList || draft.serviceList || '';
   updateComplianceDescriptionCounter();
@@ -1217,7 +1219,7 @@ function renderCompliance() {
 
 function handleComplianceSubmit(form) {
   const data = new FormData(form);
-  const description = String(data.get('description') || '').trim();
+  const description = String(data.get('description') || '').trim().slice(0, 500);
   const businessName = String(data.get('businessName') || '').trim();
   const serviceList = String(data.get('serviceList') || '').trim();
   if (description.length < 12) {

@@ -1634,7 +1634,7 @@ body :is(.preview-chat-heading strong, .preview-chat-heading small, .preview-nam
   }
 
   .dashboard-topbar h1 {
-    overflow-wrap: normal;
+    overflow-wrap: anywhere;
     word-break: normal;
   }
 
@@ -4420,6 +4420,10 @@ em {
 #compliance-clauses-empty[hidden],
 .demo-advance-button[hidden] {
   display: none !important;
+}
+
+.form-error {
+  color: var(--color-error);
 }
 
 @media (max-width: 860px) {
