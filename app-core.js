@@ -137,6 +137,106 @@ export function checkBusinessNameAvailability(value = '') {
   };
 }
 
+const businessAnalysisProfiles = [
+  {
+    pattern: /(fashion|clothing|retail|shop|store|e[- ]?commerce|online|deliver|product|sell)/i,
+    category: 'Retail & e-commerce',
+    objective: 'To sell and deliver consumer products through a clear retail channel.',
+    activity: 'Retail sales, online orders and customer delivery within Nigeria.',
+    compliance: 'Keep product, delivery and customer records consistent with the stated business activity.',
+  },
+  {
+    pattern: /(food|catering|restaurant|meal|bakery|hospitality|cook|kitchen)/i,
+    category: 'Food & hospitality',
+    objective: 'To prepare, package and provide food or hospitality services to customers.',
+    activity: 'Food preparation, hospitality services and related customer support.',
+    compliance: 'Check any local food-handling, premises or public-health requirements before operating.',
+  },
+  {
+    pattern: /(software|technology|tech|app|digital|web|data|design|consult)/i,
+    category: 'Technology & digital services',
+    objective: 'To provide digital products, technology services or professional support.',
+    activity: 'Digital products, consulting, implementation and customer support services.',
+    compliance: 'Describe the service clearly and keep customer, privacy and intellectual-property obligations in view.',
+  },
+];
+
+function getBusinessAnalysisProfile(description = '', serviceList = '') {
+  const combinedText = `${description} ${serviceList}`.trim();
+  return businessAnalysisProfiles.find((profile) => profile.pattern.test(combinedText)) || {
+    category: 'Professional services',
+    objective: 'To provide practical services and support to customers in the chosen field.',
+    activity: 'Professional services, customer support and related business activities.',
+    compliance: 'Use a precise description and confirm any sector-specific approvals before operating.',
+  };
+}
+
+function createComplianceSuggestions(businessName = '') {
+  const baseName = normalizeBusinessName(businessName).replace(/[^A-Za-z0-9À-ÿ'&\s-]/g, '').trim() || 'Ayo';
+  return [
+    `${baseName} Ventures`,
+    `${baseName} Collective`,
+    `${baseName} Nigeria`,
+    `${baseName} Works`,
+  ].map((name, index) => ({
+    name,
+    availability: index === 0 ? 'Likely available' : 'Check before filing',
+    risk: index === 0 ? 'Low' : index === 1 ? 'Low' : 'Moderate',
+  }));
+}
+
+export function analyzeBusinessIdea({ businessName = '', description = '', serviceList = '', businessType = 'Business Name' } = {}) {
+  const profile = getBusinessAnalysisProfile(description, serviceList);
+  const nameCheck = checkBusinessNameAvailability(businessName);
+  const normalizedDescription = normalizeBusinessName(description);
+  const nameRisk = nameCheck.status === 'unavailable' || nameCheck.status === 'restricted'
+    ? { label: 'High', score: 32, note: 'This name needs a different direction before filing.' }
+    : nameCheck.status === 'empty'
+      ? { label: 'Medium', score: 58, note: 'Add a working name to make the conflict check useful.' }
+      : { label: 'Low', score: 88, note: 'No conflict found in this local demo checker.' };
+  const rejectionRisk = normalizedDescription.length >= 32
+    ? { label: 'Low', score: 82, note: 'The description gives the reviewer a clear starting point.' }
+    : { label: 'Medium', score: 56, note: 'Add what you sell, who you serve and where you operate.' };
+
+  return {
+    category: profile.category,
+    recommendedRegistration: businessType || 'Business Name',
+    nameRisk,
+    rejectionRisk,
+    suggestions: createComplianceSuggestions(businessName),
+    clauses: [
+      { title: 'Business objectives', body: profile.objective },
+      { title: 'Nature of business', body: profile.activity },
+      { title: 'Business activities', body: normalizeBusinessName(serviceList) || profile.activity },
+      { title: 'Compliance requirements', body: profile.compliance },
+    ],
+    legalReferences: [
+      {
+        label: 'CAMA 2020 · Section 27',
+        description: 'Prototype reference for business-name registration context. Confirm legal wording before filing.',
+        href: 'https://www.cac.gov.ng/',
+      },
+    ],
+  };
+}
+
+export function getDashboardMetrics(draft = {}) {
+  const stageLabels = {
+    data: 'Data pending',
+    documents: 'Data pending',
+    payment: 'Payment',
+    verifying: 'Verifying',
+    waiting: 'Waiting for CAC',
+    registered: 'Registered',
+  };
+  return {
+    totalApplications: draft.businessName ? 1 : 0,
+    systemStatus: 'Active',
+    estimatedApprovalTime: '24 hours',
+    currentStage: stageLabels[draft.stage] || stageLabels.data,
+  };
+}
+
 const localizedCopy = {
   en: {
     dashboard: {

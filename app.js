@@ -4,12 +4,14 @@ import {
   createBrandKit,
   createRegistrationDraft,
   getApplicationTimeline,
+  getDashboardMetrics,
   getLocalizedCopy,
   getNextApplicationStage,
   getRegistrationGuidance,
   getRegistrationProgress,
   getRegulAIReply,
   analyzePdfText,
+  analyzeBusinessIdea,
   canAdvanceToPayment,
   isValidEmail,
   normalizeBusinessName,
@@ -19,7 +21,7 @@ import {
 } from './app-core.js';
 
 const STORAGE_KEY = 'regulai-client-prototype-v1';
-const validRoutes = new Set(['landing', 'login', 'register', 'dashboard', 'admin']);
+const validRoutes = new Set(['landing', 'login', 'register', 'dashboard', 'compliance', 'admin']);
 const registrationSteps = [
   { id: 'data', label: 'Business details' },
   { id: 'documents', label: 'Document check' },
@@ -631,7 +633,7 @@ function syncLanguageControls() {
 
 function navigate(route, updateHash = true) {
   const targetRoute = validRoutes.has(route) ? route : 'landing';
-  if (['dashboard', 'admin'].includes(targetRoute) && !state.user) {
+  if (['dashboard', 'compliance', 'admin'].includes(targetRoute) && !state.user) {
     if (window.location.hash !== '#login') history.replaceState(null, '', '#login');
     navigate('login', false);
     showToast('Sign in to open your workspace.');
@@ -653,6 +655,7 @@ function navigate(route, updateHash = true) {
 
   if (targetRoute === 'register') renderRegistration();
   if (targetRoute === 'dashboard') renderDashboard();
+  if (targetRoute === 'compliance') renderCompliance();
   if (targetRoute === 'admin') renderAdmin();
   syncLanguageControls();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1021,6 +1024,9 @@ function renderDashboard() {
   const progress = draft ? getRegistrationProgress(draft.stage) : 0;
   const userName = state.user?.name || 'Ayo Olatunji';
 
+  renderDashboardNavigation();
+  renderDashboardMetrics(draft);
+  renderDashboardActivity(draft, timeline, copy);
   setText('#dashboard-user-name', userName);
   setText('#dashboard-first-name', userName.split(' ')[0]);
   setText('#dashboard-chat-greeting', `Hi ${userName.split(' ')[0]}. What would you like to make clearer today?`);
@@ -1099,6 +1105,145 @@ function renderDashboard() {
   renderDashboardBrandKit();
   renderCertificateCard();
   resetGuideChat();
+}
+
+function renderDashboardNavigation() {
+  const navigation = document.querySelector('.dashboard-nav');
+  if (!navigation) return;
+  navigation.innerHTML = `
+    <button class="is-active" type="button" data-action="dashboard-overview"><span aria-hidden="true">⌂</span><span>Overview</span></button>
+    <button type="button" data-action="dashboard-applications"><span aria-hidden="true">▤</span><span>My applications</span></button>
+    <button type="button" data-route="register"><span aria-hidden="true">＋</span><span>Business names</span></button>
+    <button type="button" data-action="open-documents"><span aria-hidden="true">□</span><span>Documents</span></button>
+    <button type="button" data-route="compliance"><span aria-hidden="true">✦</span><span>Compliance</span></button>
+    <button type="button" data-action="brand-preview"><span aria-hidden="true">◈</span><span>Brand kit</span></button>
+    <button type="button" data-action="notifications"><span aria-hidden="true">♢</span><span>Notifications</span><span class="dashboard-nav-count" id="dashboard-nav-count" hidden>0</span></button>
+    <button type="button" data-action="dashboard-settings"><span aria-hidden="true">⚙</span><span>Settings</span></button>`;
+}
+
+function renderDashboardMetrics(draft) {
+  const content = document.querySelector('.dashboard-content');
+  const heading = document.querySelector('.dashboard-heading-row');
+  if (!content || !heading) return;
+  let metrics = document.querySelector('#dashboard-metrics');
+  if (!metrics) {
+    metrics = document.createElement('section');
+    metrics.id = 'dashboard-metrics';
+    metrics.className = 'dashboard-metrics';
+    heading.insertAdjacentElement('afterend', metrics);
+  }
+  const values = getDashboardMetrics(draft || {});
+  metrics.innerHTML = [
+    ['Total applications', values.totalApplications, 'Local demo records', 'metric-blue'],
+    ['System status', values.systemStatus, 'Workspace available', 'metric-green'],
+    ['Estimated approval time', values.estimatedApprovalTime, 'Prototype estimate', 'metric-amber'],
+    ['Current stage', values.currentStage, 'Application tracker', 'metric-indigo'],
+  ].map(([label, value, note, tone]) => `<article class="metric-card ${tone}"><span>${label}</span><strong>${escapeHtml(value)}</strong><small>${note}</small></article>`).join('');
+}
+
+function renderDashboardActivity(draft, timeline, copy) {
+  const content = document.querySelector('.dashboard-content');
+  const anchor = document.querySelector('#certificate-card') || document.querySelector('.status-dashboard-card');
+  if (!content || !anchor) return;
+  let activity = document.querySelector('#dashboard-activity');
+  if (!activity) {
+    activity = document.createElement('section');
+    activity.id = 'dashboard-activity';
+    activity.className = 'dashboard-activity-grid';
+    anchor.insertAdjacentElement('afterend', activity);
+  }
+  const current = timeline.find((item) => item.status === 'current') || timeline[0];
+  const recent = [
+    { title: 'Application saved', text: 'Business details are available in your workspace.', status: 'complete' },
+    { title: 'Name direction checked', text: draft?.nameCheck?.message || 'Run the local checker before filing.', status: draft?.nameCheck?.status === 'available' ? 'complete' : 'next' },
+    { title: copy.tracker[current.id] || current.label, text: current.note, status: current.status },
+  ];
+  activity.innerHTML = `<section class="activity-panel"><div class="dashboard-section-heading"><div><span class="section-label">Recent activity</span><h3>What has changed</h3></div><button type="button" class="text-button" data-action="notifications">View all</button></div><div class="activity-list">${recent.map((item) => `<div class="activity-item"><span class="activity-marker is-${item.status}">${item.status === 'complete' ? '✓' : '•'}</span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p></div></div>`).join('')}</div></section><aside class="next-action-panel"><span class="next-action-kicker">Next useful step</span><h3>${escapeHtml(dashboardNextAction(draft?.stage || 'data').replace(/^Next:\s*/, ''))}</h3><p>RegulAI keeps the next action visible so your application never feels like a black box.</p><button type="button" class="button button-secondary" data-route="compliance">Open Smart Compliance</button></aside>`;
+}
+
+function renderCompliance() {
+  const draft = state.draft || {};
+  const analysis = state.complianceAnalysis;
+  const descriptionInput = document.querySelector('#compliance-description');
+  const nameInput = document.querySelector('#compliance-business-name');
+  const serviceInput = document.querySelector('#compliance-service-list');
+  if (descriptionInput && !descriptionInput.value) descriptionInput.value = analysis?.description || draft.description || '';
+  if (nameInput && !nameInput.value) nameInput.value = analysis?.businessName || draft.businessName || '';
+  if (serviceInput && !serviceInput.value) serviceInput.value = analysis?.serviceList || draft.serviceList || '';
+
+  const emptyState = document.querySelector('#compliance-analysis-empty');
+  const resultState = document.querySelector('#compliance-analysis-result');
+  const clausesEmpty = document.querySelector('#compliance-clauses-empty');
+  const clauseList = document.querySelector('#compliance-clause-list');
+  const legalReferences = document.querySelector('#compliance-legal-references');
+  const status = document.querySelector('#compliance-analysis-status');
+  if (!analysis) {
+    if (emptyState) emptyState.hidden = false;
+    if (resultState) resultState.hidden = true;
+    if (clausesEmpty) clausesEmpty.hidden = false;
+    if (clauseList) clauseList.innerHTML = '';
+    if (legalReferences) legalReferences.innerHTML = '';
+    if (status) status.innerHTML = '<i></i> Waiting for your description';
+    return;
+  }
+
+  if (emptyState) emptyState.hidden = true;
+  if (resultState) resultState.hidden = false;
+  if (clausesEmpty) clausesEmpty.hidden = true;
+  if (status) status.innerHTML = '<i></i> Analysis ready';
+  setText('#compliance-category', analysis.category);
+  setText('#compliance-recommendation', `Recommended registration · ${analysis.recommendedRegistration}`);
+  setText('#compliance-name-risk', analysis.nameRisk.label);
+  setText('#compliance-name-risk-note', analysis.nameRisk.note);
+  setText('#compliance-rejection-risk', analysis.rejectionRisk.label);
+  setText('#compliance-rejection-risk-note', analysis.rejectionRisk.note);
+  const nameRisk = document.querySelector('#compliance-name-risk');
+  const rejectionRisk = document.querySelector('#compliance-rejection-risk');
+  nameRisk?.classList.toggle('risk-high', analysis.nameRisk.label === 'High');
+  nameRisk?.classList.toggle('risk-medium', analysis.nameRisk.label === 'Medium');
+  rejectionRisk?.classList.toggle('risk-high', analysis.rejectionRisk.label === 'High');
+  rejectionRisk?.classList.toggle('risk-medium', analysis.rejectionRisk.label === 'Medium');
+  document.querySelector('#compliance-suggestions').innerHTML = analysis.suggestions.map((suggestion) => `<button type="button" class="suggestion-result" data-compliance-name="${escapeHtml(suggestion.name)}"><span><strong>${escapeHtml(suggestion.name)}</strong><small>${escapeHtml(suggestion.availability)}</small></span><em>${escapeHtml(suggestion.risk)}</em><span aria-hidden="true">↗</span></button>`).join('');
+  if (clauseList) clauseList.innerHTML = analysis.clauses.map((clause) => `<article class="clause-item"><span class="clause-icon">✓</span><div><strong>${escapeHtml(clause.title)}</strong><p>${escapeHtml(clause.body)}</p></div></article>`).join('');
+  if (legalReferences) legalReferences.innerHTML = `<div class="legal-reference-heading"><span>Legal context</span><small>Review before filing</small></div>${analysis.legalReferences.map((reference) => `<a class="legal-reference" href="${escapeHtml(reference.href)}" target="_blank" rel="noreferrer"><span><strong>${escapeHtml(reference.label)}</strong><small>${escapeHtml(reference.description)}</small></span><span aria-hidden="true">↗</span></a>`).join('')}`;
+}
+
+function handleComplianceSubmit(form) {
+  const data = new FormData(form);
+  const description = String(data.get('description') || '').trim();
+  const businessName = String(data.get('businessName') || '').trim();
+  const serviceList = String(data.get('serviceList') || '').trim();
+  if (description.length < 12) {
+    setError('#compliance-error', 'Describe what you sell, who you serve or how the business operates.');
+    document.querySelector('#compliance-description')?.focus();
+    return;
+  }
+
+  const analysis = analyzeBusinessIdea({
+    businessName: businessName || state.draft?.businessName || 'Ayo',
+    description,
+    serviceList,
+    businessType: state.draft?.businessType || 'Business Name',
+  });
+  state.complianceAnalysis = { ...analysis, description, businessName, serviceList };
+  state.draft ||= createRegistrationDraft({ language: state.language });
+  state.draft.description = description;
+  if (businessName) state.draft.businessName = normalizeBusinessName(businessName);
+  if (serviceList) state.draft.serviceList = normalizeBusinessName(serviceList);
+  saveState();
+  renderCompliance();
+  addNotification('Business analysis ready', 'Your category, name direction and compliance starting points are ready to review.', 'success');
+  showToast('Analysis ready. Review the recommendations below.');
+}
+
+function handleComplianceQuestion(question) {
+  const analysis = state.complianceAnalysis;
+  const answer = /why.*registration/i.test(question) && analysis
+    ? `${analysis.recommendedRegistration} is the current demo recommendation because it matches the business description. Confirm the final structure with a qualified adviser.`
+    : /prepare next/i.test(question)
+      ? dashboardNextAction(state.draft?.stage || 'data')
+      : getRegulAIReply(question, state.language);
+  setText('#compliance-assistant-response', answer);
 }
 
 function renderAdmin() {
@@ -1349,6 +1494,16 @@ function handleDemoLogin() {
   showToast('Demo account opened.');
 }
 
+function applyShareableDemoAccess() {
+  const isDemoRoute = new URLSearchParams(window.location.search).get('demo') === '1';
+  if (!isDemoRoute) return;
+
+  state.user ||= { email: 'ayo@regulai.demo', name: 'Ayo Olatunji' };
+  state.draft ||= createRegistrationDraft({ businessName: 'Ayo’s Table', language: state.language });
+  seedDemoNotifications();
+  saveState();
+}
+
 function handleClick(event) {
   if (accountPopover && !accountPopover.hidden && !event.target.closest('#account-popover') && !event.target.closest('[data-action="account-menu"]')) {
     closeAccountMenu();
@@ -1368,6 +1523,27 @@ function handleClick(event) {
       destination.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     setMobileMenu(false);
+    return;
+  }
+
+  const complianceExample = event.target.closest('[data-compliance-example]');
+  if (complianceExample) {
+    const description = document.querySelector('#compliance-description');
+    if (description) {
+      description.value = complianceExample.dataset.complianceExample || '';
+      description.focus();
+    }
+    return;
+  }
+
+  const complianceName = event.target.closest('[data-compliance-name]');
+  if (complianceName) {
+    const nameInput = document.querySelector('#compliance-business-name');
+    if (nameInput) {
+      nameInput.value = complianceName.dataset.complianceName || '';
+      nameInput.focus();
+      showToast('Suggestion added to your working name.');
+    }
     return;
   }
 
@@ -1403,6 +1579,36 @@ function handleClick(event) {
     state.registrationStep = registrationSteps[Math.max(0, currentIndex - 1)].id;
     saveState();
     renderRegistration();
+  }
+
+  if (action === 'open-documents') {
+    state.draft ||= createRegistrationDraft({ language: state.language });
+    state.registrationStep = 'documents';
+    saveState();
+    navigate('register');
+    return;
+  }
+
+  if (action === 'dashboard-overview') {
+    navigate('dashboard');
+    return;
+  }
+
+  if (action === 'dashboard-applications') {
+    navigate('dashboard');
+    document.querySelector('.status-dashboard-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast('Showing your active application.');
+    return;
+  }
+
+  if (action === 'dashboard-settings') {
+    showAccountMenu(actionButton);
+    return;
+  }
+
+  if (action === 'compliance-question') {
+    handleComplianceQuestion(actionButton.dataset.question || '');
+    return;
   }
 
   if (action === 'demo-login') handleDemoLogin();
@@ -1494,6 +1700,7 @@ function handleSubmit(event) {
   if (event.target.id === 'document-form') handleDocumentSubmit();
   if (event.target.id === 'payment-form') handlePaymentSubmit(event.submitter?.value || 'success');
   if (event.target.id === 'chat-form') handleChatSubmit(event.target);
+  if (event.target.id === 'compliance-form') handleComplianceSubmit(event.target);
 }
 
 function handleChange(event) {
@@ -1510,6 +1717,7 @@ function handleChange(event) {
   const activeScreen = document.querySelector('.screen.is-active')?.dataset.screen;
   if (activeScreen === 'register') renderRegistration();
   if (activeScreen === 'dashboard') renderDashboard();
+  if (activeScreen === 'compliance') renderCompliance();
   showToast(`Language set to ${languageLabel(state.language)}.`);
 }
 
@@ -1538,5 +1746,6 @@ document.addEventListener('keydown', handleKeydown);
 window.addEventListener('hashchange', handleHashChange);
 
 const initialRoute = window.location.hash.slice(1);
+applyShareableDemoAccess();
 observeLandingSections();
 navigate(validRoutes.has(initialRoute) ? initialRoute : 'landing', false);

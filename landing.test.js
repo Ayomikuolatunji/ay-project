@@ -70,3 +70,29 @@ test('document flow uses browser PDF text parsing instead of image scanning', ()
   assert.match(appSource, /analyzePdfText/);
   assert.match(appSource, /Scanned or image-only PDFs are not supported/);
 });
+
+test('includes the report-required compliance workspace and full dashboard navigation', () => {
+  assert.match(landingMarkup, /data-screen="compliance"/);
+  assert.match(landingMarkup, /id="compliance-form"/);
+  assert.match(landingMarkup, /id="compliance-analysis"/);
+  assert.match(landingMarkup, /id="compliance-clauses"/);
+  assert.match(appSource, /data-action="dashboard-applications"/);
+  assert.match(appSource, /data-action="open-documents"/);
+  assert.match(appSource, /data-route="compliance"/);
+  assert.match(appSource, /data-action="dashboard-settings"/);
+});
+
+test('supports shareable client-only demo routes for user and admin review', () => {
+  assert.match(appSource, /URLSearchParams\(window\.location\.search\)\.get\('demo'\)/);
+  assert.match(appSource, /=== '1'/);
+  assert.match(appSource, /targetRoute === 'admin'/);
+  assert.match(appSource, /targetRoute === 'dashboard'/);
+});
+
+test('uses an accessible type and contrast foundation for the redesigned workspace', () => {
+  assert.match(landingStyles, /--color-ink:\s*#102a3a/i);
+  assert.match(landingStyles, /--color-primary:\s*#3157d5/i);
+  assert.match(landingStyles, /font-size:\s*16px/);
+  assert.match(landingStyles, /min-height:\s*44px/);
+  assert.match(landingStyles, /prefers-reduced-motion/);
+});

@@ -16,6 +16,8 @@ import {
   validateDocumentFile,
   verifyDocumentReadiness,
   canAdvanceToPayment,
+  analyzeBusinessIdea,
+  getDashboardMetrics,
   isValidEmail,
   normalizeBusinessName,
   validateRegistrationDetails,
@@ -174,6 +176,37 @@ test('checks demo business-name availability and suggests alternatives', () => {
   assert.deepEqual(unavailable.suggestions, ['Zenith Trade Hub', 'Zenith Point Traders']);
   assert.equal(available.status, 'available');
   assert.match(available.message, /available/i);
+});
+
+test('turns a plain-language business idea into grounded compliance guidance', () => {
+  const analysis = analyzeBusinessIdea({
+    businessName: 'AyoStyle',
+    description: 'I sell fashion products online and deliver clothing across Nigeria.',
+    serviceList: 'Ready-to-wear clothing, online delivery',
+  });
+
+  assert.equal(analysis.category, 'Retail & e-commerce');
+  assert.equal(analysis.recommendedRegistration, 'Business Name');
+  assert.equal(analysis.nameRisk.label, 'Low');
+  assert.equal(analysis.rejectionRisk.label, 'Low');
+  assert.equal(analysis.suggestions.length, 4);
+  assert.equal(analysis.suggestions[0].name, 'AyoStyle Ventures');
+  assert.ok(analysis.clauses.some((clause) => clause.title === 'Business objectives'));
+  assert.equal(analysis.legalReferences[0].label, 'CAMA 2020 · Section 27');
+});
+
+test('returns dashboard metrics from the local registration state', () => {
+  const metrics = getDashboardMetrics({
+    stage: 'waiting',
+    businessName: 'Ayo Foods',
+  });
+
+  assert.deepEqual(metrics, {
+    totalApplications: 1,
+    systemStatus: 'Active',
+    estimatedApprovalTime: '24 hours',
+    currentStage: 'Waiting for CAC',
+  });
 });
 
 test('parses selectable PDF text into identity fields without claiming biometric verification', () => {
