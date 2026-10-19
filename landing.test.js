@@ -85,8 +85,22 @@ test('includes the report-required compliance workspace and full dashboard navig
 test('supports shareable client-only demo routes for user and admin review', () => {
   assert.match(appSource, /URLSearchParams\(window\.location\.search\)\.get\('demo'\)/);
   assert.match(appSource, /=== '1'/);
+  assert.match(appSource, /DEMO_STORAGE_KEY/);
   assert.match(appSource, /targetRoute === 'admin'/);
   assert.match(appSource, /targetRoute === 'dashboard'/);
+});
+
+test('keeps the compliance form bounded and updates its live counter', () => {
+  assert.match(landingMarkup, /id="compliance-description"[^>]*maxlength="500"/);
+  assert.match(landingMarkup, /id="compliance-description-count"/);
+  assert.match(appSource, /function handleInput/);
+  assert.match(appSource, /compliance-description-count/);
+});
+
+test('keeps the dashboard usable on narrow screens', () => {
+  assert.match(landingStyles, /\.dashboard-sidebar\s*\{\s*display:\s*flex;/s);
+  assert.match(landingStyles, /\.status-tracker\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,/s);
+  assert.match(landingStyles, /\.dashboard-topbar\s*\{[\s\S]*flex-direction:\s*column;/s);
 });
 
 test('uses an accessible type and contrast foundation for the redesigned workspace', () => {

@@ -21,6 +21,8 @@ import {
 } from './app-core.js';
 
 const STORAGE_KEY = 'regulai-client-prototype-v1';
+const DEMO_STORAGE_KEY = `${STORAGE_KEY}-shareable`;
+const isShareableDemoRoute = new URLSearchParams(window.location.search).get('demo') === '1';
 const validRoutes = new Set(['landing', 'login', 'register', 'dashboard', 'compliance', 'admin']);
 const registrationSteps = [
   { id: 'data', label: 'Business details' },
@@ -136,15 +138,19 @@ function observeLandingSections() {
 
 function loadState() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    const saved = JSON.parse(localStorage.getItem(activeStorageKey()) || 'null');
     return saved && typeof saved === 'object' ? { ...defaultState, ...saved } : { ...defaultState };
   } catch {
     return { ...defaultState };
   }
 }
 
+function activeStorageKey() {
+  return isShareableDemoRoute ? DEMO_STORAGE_KEY : STORAGE_KEY;
+}
+
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(activeStorageKey(), JSON.stringify(state));
 }
 
 function ensureStageHistory() {
@@ -1170,6 +1176,7 @@ function renderCompliance() {
   if (descriptionInput && !descriptionInput.value) descriptionInput.value = analysis?.description || draft.description || '';
   if (nameInput && !nameInput.value) nameInput.value = analysis?.businessName || draft.businessName || '';
   if (serviceInput && !serviceInput.value) serviceInput.value = analysis?.serviceList || draft.serviceList || '';
+  updateComplianceDescriptionCounter();
 
   const emptyState = document.querySelector('#compliance-analysis-empty');
   const resultState = document.querySelector('#compliance-analysis-result');
@@ -1219,8 +1226,9 @@ function handleComplianceSubmit(form) {
     return;
   }
 
+  setError('#compliance-error', '');
   const analysis = analyzeBusinessIdea({
-    businessName: businessName || state.draft?.businessName || 'Ayo',
+    businessName: businessName || state.draft?.businessName || '',
     description,
     serviceList,
     businessType: state.draft?.businessType || 'Business Name',
@@ -1495,11 +1503,15 @@ function handleDemoLogin() {
 }
 
 function applyShareableDemoAccess() {
-  const isDemoRoute = new URLSearchParams(window.location.search).get('demo') === '1';
-  if (!isDemoRoute) return;
+  if (!isShareableDemoRoute) return;
 
-  state.user ||= { email: 'ayo@regulai.demo', name: 'Ayo Olatunji' };
-  state.draft ||= createRegistrationDraft({ businessName: 'Ayo’s Table', language: state.language });
+  state = {
+    ...defaultState,
+    brandKit: { ...defaultState.brandKit },
+    user: { email: 'ayo@regulai.demo', name: 'Ayo Olatunji' },
+    draft: createRegistrationDraft({ businessName: 'Ayo’s Table', language: 'en' }),
+    notifications: [],
+  };
   seedDemoNotifications();
   saveState();
 }
@@ -1531,6 +1543,7 @@ function handleClick(event) {
     const description = document.querySelector('#compliance-description');
     if (description) {
       description.value = complianceExample.dataset.complianceExample || '';
+      updateComplianceDescriptionCounter();
       description.focus();
     }
     return;
@@ -1703,6 +1716,17 @@ function handleSubmit(event) {
   if (event.target.id === 'compliance-form') handleComplianceSubmit(event.target);
 }
 
+function updateComplianceDescriptionCounter() {
+  const description = document.querySelector('#compliance-description');
+  const counter = document.querySelector('#compliance-description-count');
+  if (!description || !counter) return;
+  counter.textContent = `${description.value.length} / ${description.maxLength || 500}`;
+}
+
+function handleInput(event) {
+  if (event.target.id === 'compliance-description') updateComplianceDescriptionCounter();
+}
+
 function handleChange(event) {
   if (event.target.matches('[data-document-input]')) {
     const file = event.target.files?.[0];
@@ -1741,6 +1765,7 @@ function handleKeydown(event) {
 
 document.addEventListener('click', handleClick);
 document.addEventListener('submit', handleSubmit);
+document.addEventListener('input', handleInput);
 document.addEventListener('change', handleChange);
 document.addEventListener('keydown', handleKeydown);
 window.addEventListener('hashchange', handleHashChange);

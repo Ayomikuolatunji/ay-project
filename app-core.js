@@ -171,18 +171,38 @@ function getBusinessAnalysisProfile(description = '', serviceList = '') {
   };
 }
 
-function createComplianceSuggestions(businessName = '') {
-  const baseName = normalizeBusinessName(businessName).replace(/[^A-Za-z0-9À-ÿ'&\s-]/g, '').trim() || 'Ayo';
-  return [
-    `${baseName} Ventures`,
-    `${baseName} Collective`,
-    `${baseName} Nigeria`,
-    `${baseName} Works`,
-  ].map((name, index) => ({
-    name,
-    availability: index === 0 ? 'Likely available' : 'Check before filing',
-    risk: index === 0 ? 'Low' : index === 1 ? 'Low' : 'Moderate',
-  }));
+function createComplianceSuggestions(businessName = '', nameCheck = {}, profile = {}) {
+  const baseName = normalizeBusinessName(businessName).replace(/[^A-Za-z0-9À-ÿ'&\s-]/g, '').trim();
+  const fallbackNames = {
+    'Retail & e-commerce': ['Market Lane', 'Commerce House', 'Everyday Goods', 'Open Market Works'],
+    'Food & hospitality': ['Neighbourhood Kitchen', 'Common Table', 'Gather & Plate', 'Good Meal House'],
+    'Technology & digital services': ['Clearline Digital', 'Northstar Systems', 'Bright Field Tech', 'Openline Digital'],
+    'Professional services': ['Clearpoint Services', 'Fieldstone Support', 'Northstar Advisory', 'Openline Services'],
+  }[profile.category] || ['Clearpoint Services', 'Fieldstone Support', 'Northstar Advisory', 'Openline Services'];
+  const generatedNames = baseName
+    ? [`${baseName} Ventures`, `${baseName} Collective`, `${baseName} Nigeria`, `${baseName} Works`]
+    : fallbackNames;
+  const candidateNames = [...(nameCheck.suggestions || []), ...generatedNames]
+    .map((name) => normalizeBusinessName(name))
+    .filter((name, index, names) => name && names.indexOf(name) === index)
+    .slice(0, 4);
+
+  return candidateNames.map((name) => {
+    const result = checkBusinessNameAvailability(name);
+    const isGeneratedFallback = !baseName;
+    const isAvailable = result.status === 'available';
+    return {
+      name,
+      availability: isGeneratedFallback
+        ? 'Suggested starting point'
+        : isAvailable
+          ? 'Local check passed'
+          : result.status === 'restricted'
+            ? 'Restricted wording'
+            : 'Needs a different direction',
+      risk: isGeneratedFallback ? 'Review' : isAvailable ? 'Low' : 'High',
+    };
+  });
 }
 
 export function analyzeBusinessIdea({ businessName = '', description = '', serviceList = '', businessType = 'Business Name' } = {}) {
@@ -203,7 +223,7 @@ export function analyzeBusinessIdea({ businessName = '', description = '', servi
     recommendedRegistration: businessType || 'Business Name',
     nameRisk,
     rejectionRisk,
-    suggestions: createComplianceSuggestions(businessName),
+    suggestions: createComplianceSuggestions(businessName, nameCheck, profile),
     clauses: [
       { title: 'Business objectives', body: profile.objective },
       { title: 'Nature of business', body: profile.activity },

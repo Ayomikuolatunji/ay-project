@@ -195,6 +195,22 @@ test('turns a plain-language business idea into grounded compliance guidance', (
   assert.equal(analysis.legalReferences[0].label, 'CAMA 2020 · Section 27');
 });
 
+test('keeps compliance name suggestions grounded in the local checker', () => {
+  const unavailable = analyzeBusinessIdea({
+    businessName: 'Dangote Ventures',
+    description: 'I sell household products through a retail store.',
+  });
+  const unnamed = analyzeBusinessIdea({
+    description: 'I provide professional services to small businesses.',
+  });
+
+  assert.equal(unavailable.nameRisk.label, 'High');
+  assert.equal(unavailable.suggestions[0].name, 'Dangoti Ventures');
+  assert.equal(unavailable.suggestions[0].availability, 'Local check passed');
+  assert.ok(unnamed.suggestions.every((suggestion) => !suggestion.name.includes('Ayo')));
+  assert.ok(unnamed.suggestions.every((suggestion) => suggestion.availability === 'Suggested starting point'));
+});
+
 test('returns dashboard metrics from the local registration state', () => {
   const metrics = getDashboardMetrics({
     stage: 'waiting',
