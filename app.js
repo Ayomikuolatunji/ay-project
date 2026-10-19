@@ -9,6 +9,7 @@ import {
   getRegistrationGuidance,
   getRegistrationProgress,
   getRegulAIReply,
+  canAdvanceToPayment,
   isValidEmail,
   normalizeBusinessName,
   validateRegistrationDetails,
@@ -88,6 +89,44 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function ensureStageHistory() {
+  if (!state.draft) return;
+  state.draft.stageHistory ||= {};
+  state.draft.stageHistory.data ||= new Date().toISOString();
+  const currentStage = trackerStage(state.draft.stage || 'data');
+  state.draft.stageHistory[currentStage] ||= new Date().toISOString();
+}
+
+function setDraftStage(stage) {
+  if (!state.draft) return;
+  ensureStageHistory();
+  state.draft.stage = stage;
+  const normalizedStage = trackerStage(stage);
+  state.draft.stageHistory[normalizedStage] ||= new Date().toISOString();
+}
+
+function formatStageTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-NG', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function dashboardNextAction(stage) {
+  return {
+    data: 'Next: complete the document readiness check before payment.',
+    documents: 'Next: complete the document readiness check before payment.',
+    payment: 'Next: review the filing details and submit the mock payment.',
+    verifying: 'No action needed: the demo is verifying your application.',
+    waiting: 'Next: the demo is waiting for CAC. Advance the status when ready.',
+    registered: 'Registration complete: explore your certificate and starter brand kit.',
+  }[stage] || 'Next: review your application status.';
 }
 
 function escapeHtml(value = '') {
@@ -322,7 +361,8 @@ function copyBrandProfile() {
 
 function renderApplicationTimeline() {
   const copy = getLocalizedCopy(state.language);
-  const timeline = getApplicationTimeline(trackerStage(state.draft?.stage || 'data'));
+  ensureStageHistory();
+  const timeline = getApplicationTimeline(trackerStage(state.draft?.stage || 'data'), state.draft?.stageHistory);
   const current = timeline.find((item) => item.status === 'current') || timeline[0];
   const currentLabel = document.querySelector('#timeline-current-label');
   const currentNote = document.querySelector('#timeline-current-note');
@@ -333,7 +373,7 @@ function renderApplicationTimeline() {
   currentNote.textContent = current.note;
   list.innerHTML = timeline.map((item, index) => `<div class="timeline-item is-${item.status}">
     <span class="timeline-marker">${item.status === 'complete' ? '✓' : index + 1}</span>
-    <div class="timeline-item-copy"><div><strong>${escapeHtml(copy.tracker[item.id] || item.label)}</strong><span>${escapeHtml(copy.timeline[item.status])}</span></div><p>${escapeHtml(item.note)}</p></div>
+    <div class="timeline-item-copy"><div><strong>${escapeHtml(copy.tracker[item.id] || item.label)}</strong><span>${escapeHtml(copy.timeline[item.status])}</span></div><p>${escapeHtml(item.note)}</p>${item.timestamp ? `<time datetime="${escapeHtml(item.timestamp)}">Updated ${escapeHtml(formatStageTimestamp(item.timestamp))}</time>` : ''}</div>
   </div>`).join('');
 }
 
@@ -593,6 +633,10 @@ function renderRegistration() {
   stage.innerHTML = renderBusinessStep();
 }
 
+function renderGuideMessage(message) {
+  return `<div class="guide-message"><span class="mini-avatar">R</span><div class="guide-message-copy"><strong>RegulAI guide</strong><span>${escapeHtml(message)}</span></div></div>`;
+}
+
 function renderBusinessStep() {
   const draft = state.draft || {};
   const businessType = draft.businessType || 'Business Name';
@@ -606,7 +650,7 @@ function renderBusinessStep() {
     <h1>${escapeHtml(copy.heading)}</h1>
     <p>${escapeHtml(copy.intro)}</p>
   </div>
-  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />${escapeHtml(copy.guide)}</p></div>
+  ${renderGuideMessage(copy.guide)}
   <form class="flow-form-card" id="business-form" novalidate>
     <div class="form-grid">
       <label class="form-field form-field-wide"><span>${escapeHtml(copy.nameLabel)}</span><div class="input-action-wrap"><input id="business-name" name="businessName" type="text" value="${escapeHtml(draft.businessName || '')}" placeholder="${escapeHtml(copy.namePlaceholder)}" required maxlength="70" /><button type="button" class="field-action" data-action="check-name">${escapeHtml(copy.checkName)}</button></div>${nameCheckMarkup}</label>
@@ -635,7 +679,8 @@ function renderDocumentsStep() {
     <h1>${escapeHtml(copy.heading)}</h1>
     <p>${escapeHtml(copy.intro)}</p>
   </div>
-  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />${escapeHtml(copy.guide)}</p></div>
+  ${renderGuideMessage(copy.guide)}
+  <div class="demo-mode-note document-scope-note"><strong>OCR-style readiness only</strong><span>${escapeHtml(copy.verificationNote || 'This client demo checks file format, legibility, completeness, and extracted text. It does not perform government biometric identity verification.')}</span></div>
   <form class="flow-form-card" id="document-form">
     <div class="document-list">
       ${renderDocumentRow('identity', '▤', copy.identityTitle, copy.identityDescription, documents.identity, documentFiles.identity, documentErrors.identity, documentResults.identity, 'application/pdf,image/jpeg,image/png', copy)}
@@ -653,12 +698,17 @@ function renderDocumentRow(id, icon, title, description, status = 'pending', fil
   const fileLabel = file?.name
     ? `${escapeHtml(file.name)}${Number(file.size) > 0 ? ` · ${formatFileSize(file.size)}` : ''}`
     : escapeHtml(description);
-  const resultLabel = result?.confidence ? `Demo OCR confidence ${Math.round(result.confidence * 100)}%` : '';
+  const extractedFields = Object.entries(result?.extractedFields || {})
+    .map(([field, value]) => `${field === 'fullName' ? 'Name' : field === 'documentNumber' ? 'ID number' : 'Photo'}: ${value}`)
+    .join(' · ');
+  const resultMarkup = result
+    ? `<div class="document-result"><strong>OCR-style check · ${Math.round((result.confidence || 0) * 100)}% confidence</strong><span>Format: ${result.format || 'unknown'} · Readability: ${result.legibility || 'unknown'} · Completeness: ${result.completeness || 'unknown'}</span>${extractedFields ? `<span>${escapeHtml(extractedFields)}</span>` : ''}</div>`
+    : '';
   return `<div class="document-row ${flagged ? 'has-error' : ''}">
     <span class="document-icon" aria-hidden="true">${icon}</span>
     <div class="document-copy"><strong>${title}</strong><span>${fileLabel}</span>${error ? `<small class="document-error" role="alert">${escapeHtml(error)}</small>` : ''}</div>
     <span class="document-status ${passed ? 'is-passed' : ''} ${flagged ? 'is-failed' : ''}"><i></i>${statusLabel}</span>
-    ${resultLabel ? `<small class="document-result">${resultLabel}</small>` : ''}
+    ${resultMarkup}
     <div class="document-actions"><label class="upload-button" for="${id}-file">${file ? (copy.replace || 'Replace file') : (copy.choose || 'Choose file')}</label><input class="document-file-input" id="${id}-file" type="file" data-document-input="${id}" accept="${accept}" /><button class="demo-file-button" type="button" data-action="mock-upload" data-document="${id}">${copy.demo || 'Use demo file'}</button></div>
   </div>`;
 }
@@ -718,7 +768,7 @@ function renderPaymentStep() {
     <h1>${escapeHtml(copy.heading)}</h1>
     <p>${escapeHtml(copy.intro)}</p>
   </div>
-  <div class="guide-message"><span class="mini-avatar">R</span><p><strong>RegulAI guide</strong><br />${escapeHtml(copy.guide)}</p></div>
+  ${renderGuideMessage(copy.guide)}
   <form class="flow-form-card" id="payment-form">
     <div class="review-grid"><div class="review-item"><span>Business name</span><strong>${escapeHtml(draft.businessName || 'Your business')}</strong></div><div class="review-item"><span>Registration type</span><strong>${escapeHtml(draft.businessType || 'Business Name')}</strong></div><div class="review-item review-item-wide"><span>What the business does</span><strong>${escapeHtml(draft.description || 'Description to be confirmed')}</strong></div><div class="review-item"><span>Documents</span><strong>2 files · quality checked</strong></div><div class="review-item"><span>Preferred language</span><strong>${languageLabel(state.language)}</strong></div></div>
     <div class="payment-summary"><div><span>${escapeHtml(copy.fee)}</span><strong>₦25,000</strong></div><small>${escapeHtml(copy.sandbox)}</small></div>
@@ -771,7 +821,7 @@ function advanceDemoStatus() {
     return;
   }
 
-  state.draft.stage = nextStage;
+  setDraftStage(nextStage);
   if (nextStage === 'waiting') {
     addNotification('Application is waiting for CAC', 'The demo verification step is complete. Your application is now waiting for CAC.', 'info');
   }
@@ -844,7 +894,8 @@ function renderDashboard() {
   const copy = getLocalizedCopy(state.language);
   const displayName = draft?.businessName || 'No registration started';
   const stage = trackerStage(draft?.stage || 'data');
-  const timeline = getApplicationTimeline(stage);
+  ensureStageHistory();
+  const timeline = getApplicationTimeline(stage, draft?.stageHistory);
   const progress = draft ? getRegistrationProgress(draft.stage) : 0;
   const userName = state.user?.name || 'Ayo Olatunji';
 
@@ -852,7 +903,7 @@ function renderDashboard() {
   setText('#dashboard-first-name', userName.split(' ')[0]);
   setText('#dashboard-chat-greeting', `Hi ${userName.split(' ')[0]}. What would you like to make clearer today?`);
   setText('#dashboard-business-name', displayName);
-  setText('#dashboard-registration-type', `${draft?.businessType || 'Business Name'} registration · Started today`);
+  setText('#dashboard-registration-type', `${draft?.businessType || 'Business Name'} registration · Started ${formatStageTimestamp(draft?.stageHistory?.data) || 'today'}`);
   setText('#dashboard-progress-number', `${progress}%`);
   setText('#dashboard-breadcrumb', copy.dashboard.breadcrumb);
   setText('#dashboard-greeting-label', copy.dashboard.greeting);
@@ -860,7 +911,15 @@ function renderDashboard() {
   setText('#dashboard-heading', copy.dashboard.heading);
   setText('#dashboard-subheading', copy.dashboard.subheading);
   setText('#dashboard-continue-label', copy.dashboard.continueRegistration);
-  setText('#dashboard-status-label', draft?.stage === 'registered' ? copy.tracker.registered : copy.dashboard.applicationInProgress);
+  setText('#dashboard-status-label', copy.tracker[stage] || copy.dashboard.applicationInProgress);
+  const statusCardCopy = document.querySelector('.status-card-copy');
+  if (statusCardCopy && !document.querySelector('#dashboard-next-action')) {
+    const nextAction = document.createElement('p');
+    nextAction.className = 'dashboard-next-action';
+    nextAction.id = 'dashboard-next-action';
+    statusCardCopy.insertBefore(nextAction, statusCardCopy.querySelector('.dashboard-progress'));
+  }
+  setText('#dashboard-next-action', dashboardNextAction(draft?.stage || 'data'));
   setText('#dashboard-current-progress-label', copy.dashboard.currentProgress);
   setText('#dashboard-timeline-label', copy.dashboard.viewTimeline);
   setText('#dashboard-chat-eyebrow', copy.dashboard.alwaysAvailable);
@@ -885,6 +944,24 @@ function renderDashboard() {
     notificationCount.textContent = String(unreadNotifications);
     notificationCount.hidden = unreadNotifications === 0;
   }
+  const continueButton = document.querySelector('.dashboard-heading-row [data-route="register"], .dashboard-heading-row [data-action="open-timeline"], .dashboard-heading-row [data-action="brand-preview"]');
+  if (continueButton) {
+    const registrationStep = ['data', 'documents', 'payment'].includes(draft?.stage) ? draft.stage : null;
+    if (registrationStep) {
+      state.registrationStep = registrationStep;
+      continueButton.dataset.route = 'register';
+      continueButton.removeAttribute('data-action');
+      setText('#dashboard-continue-label', registrationStep === 'payment' ? 'Review & pay' : copy.dashboard.continueRegistration);
+    } else if (draft?.stage === 'registered') {
+      continueButton.dataset.action = 'brand-preview';
+      continueButton.removeAttribute('data-route');
+      setText('#dashboard-continue-label', 'View brand kit');
+    } else {
+      continueButton.dataset.action = 'open-timeline';
+      continueButton.removeAttribute('data-route');
+      setText('#dashboard-continue-label', 'View application status');
+    }
+  }
   const advanceStatusButton = document.querySelector('[data-action="advance-status"]');
   if (advanceStatusButton) {
     const canAdvance = ['verifying', 'waiting'].includes(draft?.stage);
@@ -894,7 +971,8 @@ function renderDashboard() {
   document.querySelector('#status-tracker').innerHTML = timeline.map((item, index) => {
     const done = item.status === 'complete';
     const active = item.status === 'current';
-    return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span>${copy.tracker[item.id] || item.label}</span></div>`;
+    const timestamp = item.timestamp ? formatStageTimestamp(item.timestamp) : 'Not started';
+    return `<div class="tracker-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}"><span class="tracker-step-marker">${done ? '✓' : index + 1}</span><span class="tracker-step-copy"><strong>${escapeHtml(copy.tracker[item.id] || item.label)}</strong><small>${escapeHtml(timestamp)}</small></span></div>`;
   }).join('');
   renderDashboardBrandKit();
   renderCertificateCard();
@@ -1028,7 +1106,7 @@ function handleBusinessSubmit(form) {
   }
 
   updateBusinessDraft(details, nameCheck);
-  state.draft.stage = 'documents';
+  setDraftStage('documents');
   state.registrationStep = 'documents';
   ensureUser();
   saveState();
@@ -1049,12 +1127,15 @@ function handleNameCheck() {
 
 function handleDocumentSubmit() {
   const documents = state.draft?.documents || {};
-  if (documents.identity !== 'passed' || documents.passport !== 'passed') {
-    setError('#document-error', 'Choose a valid file or use a demo file for both documents before continuing.');
+  if (!canAdvanceToPayment(documents)) {
+    const flagged = Object.values(documents).some((status) => status === 'flagged' || status === 'failed');
+    setError('#document-error', flagged
+      ? 'Resolve the flagged document checks and re-upload before continuing to payment.'
+      : 'Choose a valid file or use a demo file for both documents before continuing.');
     return;
   }
 
-  state.draft.stage = 'payment';
+  setDraftStage('payment');
   state.registrationStep = 'payment';
   addNotification('Documents passed the demo check', 'Both uploaded files are ready for the sandbox payment step.', 'success');
   saveState();
@@ -1075,7 +1156,7 @@ function handlePaymentSubmit(outcome = 'success') {
   }
   state.draft.payment = 'paid';
   state.draft.paymentError = '';
-  state.draft.stage = 'verifying';
+  setDraftStage('verifying');
   state.registrationStep = 'data';
   addNotification('Verification started', 'Your mock payment was accepted and the application is now in verification.', 'success');
   saveState();

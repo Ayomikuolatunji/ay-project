@@ -14,6 +14,7 @@ import {
   getNextApplicationStage,
   validateDocumentFile,
   verifyDocumentReadiness,
+  canAdvanceToPayment,
   isValidEmail,
   normalizeBusinessName,
   validateRegistrationDetails,
@@ -64,13 +65,17 @@ test('validates the minimum business details before the wizard advances', () => 
 
 test('reports the guided registration progress by stage', () => {
   assert.equal(getRegistrationProgress('data'), 20);
-  assert.equal(getRegistrationProgress('documents'), 50);
+  assert.equal(getRegistrationProgress('documents'), 20);
   assert.equal(getRegistrationProgress('payment'), 75);
   assert.equal(getRegistrationProgress('registered'), 100);
 });
 
 test('derives the application timeline state from the current stage', () => {
-  const timeline = getApplicationTimeline('verifying');
+  const timeline = getApplicationTimeline('verifying', {
+    data: '2026-10-19T08:00:00.000Z',
+    payment: '2026-10-19T08:05:00.000Z',
+    verifying: '2026-10-19T08:10:00.000Z',
+  });
 
   assert.deepEqual(timeline.map((item) => [item.id, item.status]), [
     ['data', 'complete'],
@@ -80,6 +85,7 @@ test('derives the application timeline state from the current stage', () => {
     ['registered', 'upcoming'],
   ]);
   assert.equal(timeline[2].label, 'Verifying');
+  assert.equal(timeline[2].timestamp, '2026-10-19T08:10:00.000Z');
   assert.match(timeline[2].note, /document check/i);
   assert.equal(getApplicationTimeline('unknown')[0].status, 'current');
 });
@@ -180,9 +186,44 @@ test('returns an OCR-style readiness result for clear and unclear demo documents
   assert.equal(passed.status, 'passed');
   assert.equal(passed.confidence, 0.96);
   assert.equal(passed.extractedFields.fullName, 'Ayo Olatunji');
+  assert.equal(passed.legibility, 'pass');
+  assert.equal(passed.completeness, 'complete');
+  assert.equal(passed.format, 'valid');
+  assert.equal(passed.biometricVerification, false);
   assert.equal(flagged.status, 'flagged');
   assert.ok(flagged.confidence < 0.75);
+  assert.equal(flagged.legibility, 'flagged');
+  assert.equal(flagged.completeness, 'unknown');
   assert.match(flagged.message, /clear|re-upload/i);
+});
+
+test('flags incomplete and failed OCR results without treating them as identity verification', () => {
+  const incomplete = verifyDocumentReadiness({
+    documentType: 'identity',
+    name: 'incomplete-id.jpg',
+    mimeType: 'image/jpeg',
+    size: 900_000,
+  });
+  const failed = verifyDocumentReadiness({
+    documentType: 'identity',
+    name: 'ocr-failed-id.jpg',
+    mimeType: 'image/jpeg',
+    size: 900_000,
+  });
+
+  assert.equal(incomplete.status, 'flagged');
+  assert.equal(incomplete.completeness, 'incomplete');
+  assert.equal(incomplete.biometricVerification, false);
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.legibility, 'failed');
+  assert.equal(failed.biometricVerification, false);
+});
+
+test('blocks payment until both documents pass the OCR readiness check', () => {
+  assert.equal(canAdvanceToPayment({ identity: 'passed', passport: 'passed' }), true);
+  assert.equal(canAdvanceToPayment({ identity: 'flagged', passport: 'passed' }), false);
+  assert.equal(canAdvanceToPayment({ identity: 'passed', passport: 'pending' }), false);
+  assert.equal(canAdvanceToPayment({ identity: 'failed', passport: 'passed' }), false);
 });
 
 test('keeps generated brand outputs consistent with one registration record', () => {

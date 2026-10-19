@@ -117,6 +117,7 @@ const localizedCopy = {
         heading: 'Let’s make sure your documents are ready.',
         intro: 'Upload clear copies of the documents needed for your Business Name application. This demo checks format, readability, and sample OCR fields before the next step.',
         guide: 'A clear document now means less back-and-forth later. Choose a file or use a demo file for this prototype.',
+        verificationNote: 'This client demo checks file format, legibility, completeness, and extracted text. It does not perform government biometric identity verification.',
         identityTitle: 'Government-issued identity document',
         identityDescription: 'National ID, driver’s licence, or international passport',
         passportTitle: 'Passport photograph',
@@ -625,6 +626,9 @@ export function createRegistrationDraft({
     },
     payment: 'pending',
     paymentError: '',
+    stageHistory: {
+      data: new Date().toISOString(),
+    },
   };
 }
 
@@ -672,6 +676,10 @@ export function verifyDocumentReadiness({
       status: 'flagged',
       confidence: 0,
       extractedFields: {},
+      legibility: 'unknown',
+      completeness: 'unknown',
+      format: 'invalid',
+      biometricVerification: false,
       message: fileCheck.message,
     };
   }
@@ -682,7 +690,37 @@ export function verifyDocumentReadiness({
       status: 'flagged',
       confidence: 0.42,
       extractedFields: {},
+      legibility: 'flagged',
+      completeness: 'unknown',
+      format: 'valid',
+      biometricVerification: false,
       message: 'The demo OCR check could not read this clearly. Re-upload a brighter, uncropped file.',
+    };
+  }
+
+  if (/(ocr[- ]?fail|failed[- ]?ocr|unreadable)/.test(normalizedName)) {
+    return {
+      status: 'failed',
+      confidence: 0.18,
+      extractedFields: {},
+      legibility: 'failed',
+      completeness: 'unknown',
+      format: 'valid',
+      biometricVerification: false,
+      message: 'The demo OCR check failed. Re-upload the document or choose a clearer file.',
+    };
+  }
+
+  if (/(incomplete|partial|missing)/.test(normalizedName)) {
+    return {
+      status: 'flagged',
+      confidence: 0.61,
+      extractedFields: { fullName: 'Ayo Olatunji' },
+      legibility: 'pass',
+      completeness: 'incomplete',
+      format: 'valid',
+      biometricVerification: false,
+      message: 'The document is readable, but the demo OCR check found incomplete identity fields. Re-upload the complete document.',
     };
   }
 
@@ -691,6 +729,10 @@ export function verifyDocumentReadiness({
       status: 'passed',
       confidence: 0.94,
       extractedFields: { photoQuality: 'Clear passport photograph' },
+      legibility: 'pass',
+      completeness: 'complete',
+      format: 'valid',
+      biometricVerification: false,
       message: 'Photo quality check passed. The image is clear enough for the next step.',
     };
   }
@@ -702,8 +744,16 @@ export function verifyDocumentReadiness({
       fullName: 'Ayo Olatunji',
       documentNumber: '•••• 4821',
     },
+    legibility: 'pass',
+    completeness: 'complete',
+    format: 'valid',
+    biometricVerification: false,
     message: 'Demo OCR check passed. Key identity fields look complete.',
   };
+}
+
+export function canAdvanceToPayment(documents = {}) {
+  return documents.identity === 'passed' && documents.passport === 'passed';
 }
 
 export function validateRegistrationDetails({ businessName = '', businessType = '' } = {}) {
@@ -723,14 +773,14 @@ export function validateRegistrationDetails({ businessName = '', businessType = 
 export function getRegistrationProgress(stage = 'data') {
   const progressByStage = {
     data: 20,
-    documents: 50,
     payment: 75,
     verifying: 85,
     waiting: 92,
     registered: 100,
   };
 
-  return progressByStage[stage] ?? progressByStage.data;
+  const normalizedStage = stage === 'documents' ? 'data' : stage;
+  return progressByStage[normalizedStage] ?? progressByStage.data;
 }
 
 export function getNextApplicationStage(stage = 'data') {
@@ -769,13 +819,14 @@ const applicationTimeline = [
   },
 ];
 
-export function getApplicationTimeline(stage = 'data') {
+export function getApplicationTimeline(stage = 'data', stageHistory = {}) {
   const normalizedStage = stage === 'documents' ? 'data' : stage;
   const activeIndex = Math.max(0, applicationTimeline.findIndex((item) => item.id === normalizedStage));
 
   return applicationTimeline.map((item, index) => ({
     ...item,
     status: index < activeIndex ? 'complete' : index === activeIndex ? 'current' : 'upcoming',
+    timestamp: stageHistory[item.id] || '',
   }));
 }
 
