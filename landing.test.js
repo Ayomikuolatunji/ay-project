@@ -106,6 +106,15 @@ test('keeps the dashboard usable on narrow screens', () => {
   assert.match(landingStyles, /\.dashboard-topbar\s*\{[\s\S]*flex-direction:\s*column;/s);
 });
 
+test('keeps every dashboard tab inside the shared workspace shell', () => {
+  assert.match(appSource, /dashboard-overview-content/);
+  assert.match(appSource, /dashboard-subview-content/);
+  assert.match(appSource, /function selectDashboardView/);
+  assert.match(appSource, /dashboardViewActionMap/);
+  assert.match(appSource, /data-dashboard-view/);
+  assert.match(landingStyles, /\.dashboard-view-page\s*\{/);
+});
+
 test('uses an accessible type and contrast foundation for the redesigned workspace', () => {
   assert.match(landingStyles, /--color-ink:\s*#102a3a/i);
   assert.match(landingStyles, /--color-primary:\s*#3157d5/i);

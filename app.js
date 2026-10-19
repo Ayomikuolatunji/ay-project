@@ -24,6 +24,26 @@ const STORAGE_KEY = 'regulai-client-prototype-v1';
 const DEMO_STORAGE_KEY = `${STORAGE_KEY}-shareable`;
 const isShareableDemoRoute = new URLSearchParams(window.location.search).get('demo') === '1';
 const validRoutes = new Set(['landing', 'login', 'register', 'dashboard', 'compliance', 'admin']);
+const dashboardViewActionMap = {
+  'dashboard-overview': 'overview',
+  'dashboard-applications': 'applications',
+  'dashboard-business-names': 'business-names',
+  'dashboard-documents': 'documents',
+  'dashboard-compliance': 'compliance',
+  'dashboard-brand-kit': 'brand-kit',
+  'dashboard-notifications': 'notifications',
+  'dashboard-settings': 'settings',
+};
+const dashboardViewMeta = {
+  overview: { label: 'Overview', breadcrumb: 'Workspace / Overview', topbarTitle: '' },
+  applications: { label: 'My applications', breadcrumb: 'Workspace / My applications', topbarTitle: 'My applications' },
+  'business-names': { label: 'Business names', breadcrumb: 'Workspace / Business names', topbarTitle: 'Business names' },
+  documents: { label: 'Documents', breadcrumb: 'Workspace / Documents', topbarTitle: 'Document readiness' },
+  compliance: { label: 'Compliance', breadcrumb: 'Workspace / Compliance', topbarTitle: 'Smart compliance' },
+  'brand-kit': { label: 'Brand kit', breadcrumb: 'Workspace / Brand kit', topbarTitle: 'Your brand kit' },
+  notifications: { label: 'Notifications', breadcrumb: 'Workspace / Notifications', topbarTitle: 'Notifications' },
+  settings: { label: 'Settings', breadcrumb: 'Workspace / Settings', topbarTitle: 'Workspace settings' },
+};
 const registrationSteps = [
   { id: 'data', label: 'Business details' },
   { id: 'documents', label: 'Document check' },
@@ -47,6 +67,7 @@ let timelineTrigger = null;
 let guideTrigger = null;
 let accountMenuTrigger = null;
 let notificationTrigger = null;
+let activeDashboardView = 'overview';
 
 const screens = [...document.querySelectorAll('[data-screen]')];
 const toast = document.querySelector('#toast');
@@ -486,6 +507,13 @@ function closeNotifications() {
   document.body.classList.remove('timeline-modal-open');
   notificationTrigger?.focus();
   notificationTrigger = null;
+}
+
+function markDashboardNotificationsRead() {
+  state.notifications = (state.notifications || []).map((notification) => ({ ...notification, read: true }));
+  saveState();
+  renderDashboard();
+  showToast('Notifications marked as read.');
 }
 
 function renderRegistrationGuide() {
@@ -1020,6 +1048,124 @@ function downloadBrandLandingPage() {
   showToast('Landing-page template downloaded.');
 }
 
+function ensureDashboardViewShell() {
+  const content = document.querySelector('.dashboard-content');
+  if (!content) return null;
+  let overview = content.querySelector('#dashboard-overview-content');
+  let subview = content.querySelector('#dashboard-subview-content');
+  if (!overview) {
+    overview = document.createElement('div');
+    overview.id = 'dashboard-overview-content';
+    overview.className = 'dashboard-overview-content';
+    [...content.childNodes].forEach((child) => overview.appendChild(child));
+    content.appendChild(overview);
+  }
+  if (!subview) {
+    subview = document.createElement('div');
+    subview.id = 'dashboard-subview-content';
+    subview.className = 'dashboard-subview-content';
+    content.appendChild(subview);
+  }
+  return { overview, subview };
+}
+
+function setDashboardTopbar(view, userName, copy) {
+  const title = document.querySelector('.dashboard-topbar h1');
+  const breadcrumb = document.querySelector('#dashboard-breadcrumb');
+  if (!title || !breadcrumb) return;
+  const meta = dashboardViewMeta[view] || dashboardViewMeta.overview;
+  if (view === 'overview') {
+    breadcrumb.textContent = copy.dashboard.breadcrumb;
+    title.innerHTML = `<span id="dashboard-greeting-label">${escapeHtml(copy.dashboard.greeting)}</span>, <span id="dashboard-first-name">${escapeHtml(userName.split(' ')[0])}</span>.`;
+    return;
+  }
+  breadcrumb.textContent = meta.breadcrumb;
+  title.textContent = meta.topbarTitle;
+}
+
+function dashboardDocumentStatus(status = 'pending') {
+  return {
+    passed: { label: 'Ready', className: 'is-passed' },
+    processing: { label: 'Reading file', className: 'is-processing' },
+    flagged: { label: 'Review needed', className: 'is-flagged' },
+    failed: { label: 'Review needed', className: 'is-flagged' },
+    unsupported: { label: 'PDF text required', className: 'is-flagged' },
+    pending: { label: 'Pending', className: 'is-pending' },
+  }[status] || { label: 'Pending', className: 'is-pending' };
+}
+
+function renderDashboardTimeline(timeline, copy) {
+  return timeline.map((item, index) => `<div class="dashboard-view-timeline-item is-${item.status}"><span class="dashboard-view-timeline-marker">${item.status === 'complete' ? '✓' : index + 1}</span><div><strong>${escapeHtml(copy.tracker[item.id] || item.label)}</strong><span>${escapeHtml(item.note)}</span>${item.timestamp ? `<small>Updated ${escapeHtml(formatStageTimestamp(item.timestamp))}</small>` : ''}</div></div>`).join('');
+}
+
+function renderDashboardSubview(view, draft, timeline, copy) {
+  const shell = ensureDashboardViewShell();
+  if (!shell) return;
+  const { overview, subview } = shell;
+  const isOverview = view === 'overview';
+  overview.hidden = !isOverview;
+  subview.hidden = isOverview;
+  if (isOverview) {
+    subview.innerHTML = '';
+    return;
+  }
+
+  const meta = dashboardViewMeta[view] || dashboardViewMeta.overview;
+  const displayName = draft?.businessName || 'No registration started';
+  const stage = trackerStage(draft?.stage || 'data');
+  const analysis = state.complianceAnalysis;
+  const unread = (state.notifications || []).filter((notification) => !notification.read).length;
+  let content = '';
+
+  if (view === 'applications') {
+    content = `<div class="dashboard-view-grid"><section class="dashboard-view-card dashboard-view-card-dark"><div class="dashboard-view-card-heading"><div><span class="eyebrow eyebrow-light">Active application</span><h3>${escapeHtml(displayName)}</h3></div><span class="status-pill"><i></i>${escapeHtml(copy.tracker[stage] || 'In progress')}</span></div><p>${escapeHtml(draft?.businessType || 'Business Name')} registration · ${escapeHtml(dashboardNextAction(draft?.stage || 'data'))}</p><div class="dashboard-view-progress"><div><span>Application progress</span><strong>${getRegistrationProgress(draft?.stage || 'data')}%</strong></div><div><i style="width: ${getRegistrationProgress(draft?.stage || 'data')}%"></i></div></div><div class="dashboard-view-actions"><button class="button button-light" type="button" data-action="open-timeline">View timeline</button><button class="button button-outline-light" type="button" data-route="register">Continue registration</button></div></section><section class="dashboard-view-card"><div class="dashboard-view-card-heading"><div><span class="eyebrow">Five clear stages</span><h3>Know what happens next</h3></div><span class="dashboard-view-count">${timeline.filter((item) => item.status === 'complete').length} / ${timeline.length}</span></div><div class="dashboard-view-timeline">${renderDashboardTimeline(timeline, copy)}</div></section></div><section class="dashboard-view-card dashboard-view-card-wide"><div class="dashboard-view-card-heading"><div><span class="eyebrow">Application record</span><h3>Everything stays connected</h3></div><span class="dashboard-view-note">Saved locally</span></div><div class="dashboard-detail-grid"><div><span>Business name</span><strong>${escapeHtml(displayName)}</strong></div><div><span>Registration type</span><strong>${escapeHtml(draft?.businessType || 'Business Name')}</strong></div><div><span>Documents</span><strong>${Object.values(draft?.documents || {}).filter((status) => status === 'passed').length} of 2 ready</strong></div><div><span>Next action</span><strong>${escapeHtml(dashboardNextAction(draft?.stage || 'data').replace(/^Next:\s*/, ''))}</strong></div></div></section>`;
+  }
+
+  if (view === 'business-names') {
+    const nameCheck = draft?.nameCheck || { status: 'pending', message: 'Use the registration flow to check a working name before filing.', suggestions: [] };
+    const statusLabel = nameCheck.status === 'available' ? 'Local check passed' : nameCheck.status === 'unavailable' ? 'Try another name' : 'Ready to check';
+    content = `<div class="dashboard-view-grid"><section class="dashboard-view-card"><div class="dashboard-view-card-heading"><div><span class="eyebrow">Business identity</span><h3>Choose a name people can remember.</h3></div><span class="dashboard-view-note">Local checker</span></div><p class="dashboard-view-lead">Your working name stays connected to the registration record and the starter brand kit.</p><div class="dashboard-name-preview"><span>Current working name</span><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(nameCheck.message || 'No name has been checked yet.')}</small></div><button class="button button-primary" type="button" data-route="register">Open name registration</button></section><aside class="dashboard-view-card dashboard-view-card-soft"><span class="eyebrow">Name direction</span><h3>${escapeHtml(statusLabel)}</h3><p>RegulAI’s local checker only demonstrates the review step. Confirm availability through the official CAC process before filing.</p>${nameCheck.suggestions?.length ? `<div class="dashboard-chip-list">${nameCheck.suggestions.map((suggestion) => `<span>${escapeHtml(suggestion)}</span>`).join('')}</div>` : '<span class="dashboard-view-note">Suggestions appear after a check.</span>'}</aside></div>`;
+  }
+
+  if (view === 'documents') {
+    const documents = draft?.documents || {};
+    const documentRows = [
+      ['identity', 'Identity PDF', 'Selectable text PDF · no scanned images'],
+      ['passport', 'Passport photo', 'Image quality and completeness check'],
+    ].map(([id, label, description]) => {
+      const status = dashboardDocumentStatus(documents[id]);
+      return `<div class="dashboard-document-row"><div><strong>${label}</strong><span>${description}</span></div><span class="dashboard-document-status ${status.className}"><i></i>${status.label}</span></div>`;
+    }).join('');
+    content = `<section class="dashboard-view-card dashboard-view-card-wide"><div class="dashboard-view-card-heading"><div><span class="eyebrow">Document readiness</span><h3>Prepare the files before payment.</h3></div><span class="dashboard-view-note">Browser checks only</span></div><p class="dashboard-view-lead">The prototype checks file type, size, selectable PDF text, legibility and completeness. It does not perform biometric identity verification.</p><div class="dashboard-document-list">${documentRows}</div><div class="dashboard-view-actions"><button class="button button-primary" type="button" data-action="open-documents">Open document check</button><button class="button button-quiet" type="button" data-route="register">View registration flow</button></div></section><section class="dashboard-view-card dashboard-view-card-soft"><span class="eyebrow">Recovery path</span><h3>Flagged files can be replaced.</h3><p>If a file is unsupported, oversized, blurred or incomplete, the next step stays visible and payment remains blocked until the check passes.</p></section>`;
+  }
+
+  if (view === 'compliance') {
+    content = `<div class="dashboard-view-grid"><section class="dashboard-view-card dashboard-view-card-dark"><div class="dashboard-view-card-heading"><div><span class="eyebrow eyebrow-light">Smart Compliance Assistant</span><h3>Turn your idea into a clearer plan.</h3></div><span class="dashboard-view-note dashboard-view-note-light">Client-only</span></div><p>Translate a plain-language business idea into a likely category, grounded name direction and compliance starting point.</p><div class="dashboard-compliance-summary"><span>Latest analysis</span><strong>${escapeHtml(analysis?.category || 'Waiting for your business idea')}</strong><small>${analysis ? 'Analysis ready to review' : 'Start with a description in the assistant'}</small></div><button class="button button-light" type="button" data-route="compliance">Open Smart Compliance</button></section><aside class="dashboard-view-card dashboard-view-card-soft"><span class="eyebrow">Safe scope</span><h3>No government or biometric claims.</h3><p>This is a client-only explainer. It does not submit CAC filings, make payment or verify identity.</p><span class="dashboard-safe-note"><i></i> Guidance is simulated locally</span></aside></div>`;
+  }
+
+  if (view === 'brand-kit') {
+    const assets = activeBrandAssets();
+    content = `<div class="dashboard-view-grid"><section class="dashboard-view-card dashboard-view-card-dark"><div class="dashboard-view-card-heading"><div><span class="eyebrow eyebrow-light">Starter direction</span><h3>${escapeHtml(assets.brand.businessName)}</h3></div><span class="dashboard-view-note dashboard-view-note-light">${escapeHtml(assets.brand.theme.label)}</span></div><div class="dashboard-brand-preview-large"><div class="brand-kit-logo"><span>${escapeHtml(assets.brand.initials)}</span><b>+</b></div><div><strong>${escapeHtml(assets.brand.businessName)}</strong><span>${escapeHtml(assets.brand.descriptor)}</span></div></div><button class="button button-light" type="button" data-action="brand-preview">Open brand kit preview</button></section><section class="dashboard-view-card"><div class="dashboard-view-card-heading"><div><span class="eyebrow">Included outputs</span><h3>Ready to develop</h3></div></div><div class="dashboard-output-list"><span><i>✓</i>Logo concept</span><span><i>✓</i>One-page company profile</span><span><i>✓</i>Ready-to-edit landing page</span></div><p class="dashboard-view-lead">All three outputs stay aligned with the same registration record.</p></section></div>`;
+  }
+
+  if (view === 'notifications') {
+    const notifications = state.notifications || [];
+    const notificationMarkup = notifications.length ? notifications.map((notification) => `<article class="dashboard-notification-row ${notification.read ? 'is-read' : ''}"><span class="notification-dot notification-dot-${escapeHtml(notification.type || 'info')}" aria-hidden="true"></span><div><strong>${escapeHtml(notification.title)}</strong><p>${escapeHtml(notification.message)}</p><small>Local demo update</small></div></article>`).join('') : '<p class="empty-state">No updates yet. Your application activity will appear here.</p>';
+    content = `<section class="dashboard-view-card dashboard-view-card-wide"><div class="dashboard-view-card-heading"><div><span class="eyebrow">Workspace activity</span><h3>Nothing gets lost.</h3></div><span class="dashboard-view-count">${unread} new</span></div><p class="dashboard-view-lead">Status changes, document reviews and demo actions stay visible here while you work.</p><div class="dashboard-notification-list">${notificationMarkup}</div><button class="button button-quiet" type="button" data-action="dashboard-mark-notifications-read">Mark all as read</button></section>`;
+  }
+
+  if (view === 'settings') {
+    content = `<div class="dashboard-view-grid"><section class="dashboard-view-card"><div class="dashboard-view-card-heading"><div><span class="eyebrow">Your workspace</span><h3>Keep your details close.</h3></div><span class="dashboard-view-note">Saved in this browser</span></div><div class="dashboard-settings-profile"><span class="dashboard-avatar">${escapeHtml((state.user?.name || 'Ayo Olatunji').split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase())}</span><div><strong>${escapeHtml(state.user?.name || 'Ayo Olatunji')}</strong><span>${escapeHtml(state.user?.email || 'demo@regulai.local')}</span></div></div><label class="dashboard-settings-field" for="dashboard-settings-language"><span>Workspace language</span><select id="dashboard-settings-language" data-language-select aria-label="Choose workspace language"><option value="en">English</option><option value="yo">Yorùbá</option><option value="ha">Hausa</option><option value="ig">Igbo</option></select></label></section><aside class="dashboard-view-card dashboard-view-card-soft"><span class="eyebrow">Demo controls</span><h3>Reset or leave the workspace.</h3><p>This prototype stores its mock application locally so the walkthrough can be repeated without a backend.</p><div class="dashboard-view-actions dashboard-view-actions-stack"><button class="button button-quiet" type="button" data-action="reset-demo">Restart demo</button><button class="button button-dark" type="button" data-action="sign-out">Sign out</button></div></aside></div>`;
+  }
+
+  subview.innerHTML = `<div class="dashboard-view-page" data-dashboard-view-page="${escapeHtml(view)}"><div class="dashboard-view-heading"><div><span class="eyebrow">${escapeHtml(meta.label)}</span><h2>${escapeHtml(view === 'applications' ? 'Your registration, in one place.' : view === 'business-names' ? 'Make the first decision count.' : view === 'documents' ? 'Clear files. Clear next step.' : view === 'compliance' ? 'Make the rules easier to understand.' : view === 'brand-kit' ? 'Registration is the beginning.' : view === 'notifications' ? 'Stay close to every update.' : 'A calm workspace for the work ahead.')}</h2><p>${escapeHtml(view === 'applications' ? 'Review the current application, stage history and next action without leaving your workspace.' : view === 'business-names' ? 'Keep your working name, registration type and brand direction connected from the first draft.' : view === 'documents' ? 'Review what is ready, what needs attention and why payment stays protected until checks pass.' : view === 'compliance' ? 'Start with plain language and get a grounded registration starting point.' : view === 'brand-kit' ? 'Shape the name, colours and outputs that make your new business feel ready to show.' : view === 'notifications' ? 'Status changes, document reviews and demo actions stay visible while you work.' : 'Manage the local demo account and choose how the workspace speaks to you.')}</p></div></div>${content}</div>`;
+}
+
+function selectDashboardView(view) {
+  activeDashboardView = dashboardViewMeta[view] ? view : 'overview';
+  navigate('dashboard');
+}
+
 function renderDashboard() {
   const draft = state.draft;
   const copy = getLocalizedCopy(state.language);
@@ -1030,6 +1176,7 @@ function renderDashboard() {
   const progress = draft ? getRegistrationProgress(draft.stage) : 0;
   const userName = state.user?.name || 'Ayo Olatunji';
 
+  ensureDashboardViewShell();
   renderDashboardNavigation();
   renderDashboardMetrics(draft);
   renderDashboardActivity(draft, timeline, copy);
@@ -1078,6 +1225,11 @@ function renderDashboard() {
     notificationCount.textContent = String(unreadNotifications);
     notificationCount.hidden = unreadNotifications === 0;
   }
+  const navigationCount = document.querySelector('#dashboard-nav-count');
+  if (navigationCount) {
+    navigationCount.textContent = String(unreadNotifications);
+    navigationCount.hidden = unreadNotifications === 0;
+  }
   const continueButton = document.querySelector('.dashboard-heading-row [data-route="register"], .dashboard-heading-row [data-action="open-timeline"], .dashboard-heading-row [data-action="brand-preview"]');
   if (continueButton) {
     const registrationStep = ['data', 'documents', 'payment'].includes(draft?.stage) ? draft.stage : null;
@@ -1110,21 +1262,24 @@ function renderDashboard() {
   }).join('');
   renderDashboardBrandKit();
   renderCertificateCard();
+  renderDashboardSubview(activeDashboardView, draft, timeline, copy);
+  setDashboardTopbar(activeDashboardView, userName, copy);
   resetGuideChat();
 }
 
 function renderDashboardNavigation() {
   const navigation = document.querySelector('.dashboard-nav');
   if (!navigation) return;
+  const activeButton = (view) => activeDashboardView === view ? ' is-active' : '';
   navigation.innerHTML = `
-    <button class="is-active" type="button" data-action="dashboard-overview"><span aria-hidden="true">⌂</span><span>Overview</span></button>
-    <button type="button" data-action="dashboard-applications"><span aria-hidden="true">▤</span><span>My applications</span></button>
-    <button type="button" data-route="register"><span aria-hidden="true">＋</span><span>Business names</span></button>
-    <button type="button" data-action="open-documents"><span aria-hidden="true">□</span><span>Documents</span></button>
-    <button type="button" data-route="compliance"><span aria-hidden="true">✦</span><span>Compliance</span></button>
-    <button type="button" data-action="brand-preview"><span aria-hidden="true">◈</span><span>Brand kit</span></button>
-    <button type="button" data-action="notifications"><span aria-hidden="true">♢</span><span>Notifications</span><span class="dashboard-nav-count" id="dashboard-nav-count" hidden>0</span></button>
-    <button type="button" data-action="dashboard-settings"><span aria-hidden="true">⚙</span><span>Settings</span></button>`;
+    <button class="${activeButton('overview').trim()}" type="button" data-action="dashboard-overview" data-dashboard-view="overview"><span aria-hidden="true">⌂</span><span>Overview</span></button>
+    <button class="${activeButton('applications').trim()}" type="button" data-action="dashboard-applications" data-dashboard-view="applications"><span aria-hidden="true">▤</span><span>My applications</span></button>
+    <button class="${activeButton('business-names').trim()}" type="button" data-action="dashboard-business-names" data-dashboard-view="business-names"><span aria-hidden="true">＋</span><span>Business names</span></button>
+    <button class="${activeButton('documents').trim()}" type="button" data-action="dashboard-documents" data-dashboard-view="documents"><span aria-hidden="true">□</span><span>Documents</span></button>
+    <button class="${activeButton('compliance').trim()}" type="button" data-action="dashboard-compliance" data-dashboard-view="compliance"><span aria-hidden="true">✦</span><span>Compliance</span></button>
+    <button class="${activeButton('brand-kit').trim()}" type="button" data-action="dashboard-brand-kit" data-dashboard-view="brand-kit"><span aria-hidden="true">◈</span><span>Brand kit</span></button>
+    <button class="${activeButton('notifications').trim()}" type="button" data-action="dashboard-notifications" data-dashboard-view="notifications"><span aria-hidden="true">♢</span><span>Notifications</span><span class="dashboard-nav-count" id="dashboard-nav-count" hidden>0</span></button>
+    <button class="${activeButton('settings').trim()}" type="button" data-action="dashboard-settings" data-dashboard-view="settings"><span aria-hidden="true">⚙</span><span>Settings</span></button>`;
 }
 
 function renderDashboardMetrics(draft) {
@@ -1579,6 +1734,16 @@ function handleClick(event) {
   if (!actionButton) return;
   const action = actionButton.dataset.action;
 
+  if (dashboardViewActionMap[action]) {
+    selectDashboardView(dashboardViewActionMap[action]);
+    return;
+  }
+
+  if (action === 'dashboard-mark-notifications-read') {
+    markDashboardNotificationsRead();
+    return;
+  }
+
   if (action === 'mock-upload') {
     applyDocumentFile(actionButton.dataset.document, demoDocumentFiles[actionButton.dataset.document]);
     return;
@@ -1601,23 +1766,6 @@ function handleClick(event) {
     state.registrationStep = 'documents';
     saveState();
     navigate('register');
-    return;
-  }
-
-  if (action === 'dashboard-overview') {
-    navigate('dashboard');
-    return;
-  }
-
-  if (action === 'dashboard-applications') {
-    navigate('dashboard');
-    document.querySelector('.status-dashboard-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showToast('Showing your active application.');
-    return;
-  }
-
-  if (action === 'dashboard-settings') {
-    showAccountMenu(actionButton);
     return;
   }
 
