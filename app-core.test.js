@@ -12,6 +12,7 @@ import {
   getLocalizedCopy,
   getRegulAIReply,
   getNextApplicationStage,
+  analyzePdfText,
   validateDocumentFile,
   verifyDocumentReadiness,
   canAdvanceToPayment,
@@ -137,10 +138,16 @@ test('checks document type and size before marking a file ready', () => {
   }), { valid: false, message: 'Use a JPG or PNG image for the passport photograph.' });
   assert.deepEqual(validateDocumentFile({
     documentType: 'identity',
-    name: 'large-id.jpg',
-    mimeType: 'image/jpeg',
+    name: 'large-id.pdf',
+    mimeType: 'application/pdf',
     size: 6_000_000,
   }), { valid: false, message: 'Keep each document under 5 MB.' });
+  assert.deepEqual(validateDocumentFile({
+    documentType: 'identity',
+    name: 'scanned-id.jpg',
+    mimeType: 'image/jpeg',
+    size: 900_000,
+  }), { valid: false, message: 'Use a selectable-text PDF for the identity document. Scanned image files are not supported.' });
 });
 
 test('creates a personalized brand direction from the registration details', () => {
@@ -169,27 +176,56 @@ test('checks demo business-name availability and suggests alternatives', () => {
   assert.match(available.message, /available/i);
 });
 
-test('returns an OCR-style readiness result for clear and unclear demo documents', () => {
-  const passed = verifyDocumentReadiness({
-    documentType: 'identity',
-    name: 'ayo-identity.pdf',
-    mimeType: 'application/pdf',
-    size: 1_200_000,
+test('parses selectable PDF text into identity fields without claiming biometric verification', () => {
+  const passed = analyzePdfText({
+    text: [
+      'FULL NAME',
+      'AYODELE MIRACLE PETER',
+      'DATE OF BIRTH',
+      '12/03/1994',
+      'ID NUMBER',
+      'NIN 12345678901',
+    ].join('\n'),
+    pageCount: 2,
   });
+
+  assert.equal(passed.status, 'passed');
+  assert.equal(passed.parser, 'pdfjs-text');
+  assert.equal(passed.confidence, 0.98);
+  assert.equal(passed.extractedFields.fullName, 'AYODELE MIRACLE PETER');
+  assert.equal(passed.extractedFields.dateOfBirth, '12/03/1994');
+  assert.equal(passed.extractedFields.documentNumber, 'NIN 12345678901');
+  assert.equal(passed.legibility, 'pass');
+  assert.equal(passed.completeness, 'complete');
+  assert.equal(passed.format, 'pdf-text');
+  assert.equal(passed.pageCount, 2);
+  assert.equal(passed.biometricVerification, false);
+});
+
+test('flags PDFs without selectable text or required identity fields', () => {
+  const imageOnly = analyzePdfText({ text: '', pageCount: 1 });
+  const incomplete = analyzePdfText({
+    text: 'FULL NAME\nAyo Olatunji\nADDRESS\nLagos',
+    pageCount: 1,
+  });
+
+  assert.equal(imageOnly.status, 'unsupported');
+  assert.equal(imageOnly.legibility, 'no-text');
+  assert.match(imageOnly.message, /selectable text|scanned/i);
+  assert.equal(incomplete.status, 'flagged');
+  assert.equal(incomplete.completeness, 'incomplete');
+  assert.ok(incomplete.confidence < 0.98);
+  assert.equal(incomplete.biometricVerification, false);
+});
+
+test('keeps passport photo checks separate from PDF text parsing', () => {
   const flagged = verifyDocumentReadiness({
-    documentType: 'identity',
+    documentType: 'passport',
     name: 'blurry-id.jpg',
     mimeType: 'image/jpeg',
     size: 900_000,
   });
 
-  assert.equal(passed.status, 'passed');
-  assert.equal(passed.confidence, 0.96);
-  assert.equal(passed.extractedFields.fullName, 'Ayo Olatunji');
-  assert.equal(passed.legibility, 'pass');
-  assert.equal(passed.completeness, 'complete');
-  assert.equal(passed.format, 'valid');
-  assert.equal(passed.biometricVerification, false);
   assert.equal(flagged.status, 'flagged');
   assert.ok(flagged.confidence < 0.75);
   assert.equal(flagged.legibility, 'flagged');
@@ -197,25 +233,31 @@ test('returns an OCR-style readiness result for clear and unclear demo documents
   assert.match(flagged.message, /clear|re-upload/i);
 });
 
-test('flags incomplete and failed OCR results without treating them as identity verification', () => {
-  const incomplete = verifyDocumentReadiness({
+test('rejects identity images before the PDF parser can run', () => {
+  const scanned = verifyDocumentReadiness({
     documentType: 'identity',
-    name: 'incomplete-id.jpg',
-    mimeType: 'image/jpeg',
-    size: 900_000,
-  });
-  const failed = verifyDocumentReadiness({
-    documentType: 'identity',
-    name: 'ocr-failed-id.jpg',
+    name: 'scanned-id.jpg',
     mimeType: 'image/jpeg',
     size: 900_000,
   });
 
+  assert.equal(scanned.status, 'unsupported');
+  assert.match(scanned.message, /selectable-text PDF|scanned image/i);
+  assert.equal(scanned.biometricVerification, false);
+});
+
+test('flags incomplete and failed OCR results without treating them as identity verification', () => {
+  const incomplete = analyzePdfText({
+    text: 'FULL NAME\nAyo Olatunji\nADDRESS\nLagos',
+    pageCount: 1,
+  });
+  const failed = analyzePdfText({ text: '', pageCount: 1 });
+
   assert.equal(incomplete.status, 'flagged');
   assert.equal(incomplete.completeness, 'incomplete');
   assert.equal(incomplete.biometricVerification, false);
-  assert.equal(failed.status, 'failed');
-  assert.equal(failed.legibility, 'failed');
+  assert.equal(failed.status, 'unsupported');
+  assert.equal(failed.legibility, 'no-text');
   assert.equal(failed.biometricVerification, false);
 });
 

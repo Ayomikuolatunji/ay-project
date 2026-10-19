@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const landingMarkup = readFileSync(join(projectRoot, 'index.html'), 'utf8');
 const landingStyles = readFileSync(join(projectRoot, 'styles.css'), 'utf8');
+const appSource = readFileSync(join(projectRoot, 'app.js'), 'utf8');
 
 function sectionMarkup(id) {
   const match = landingMarkup.match(new RegExp(`<section\\b[^>]*\\bid="${id}"[^>]*>[\\s\\S]*?<\\/section>`));
@@ -60,4 +61,12 @@ test('new landing sections use semantic groups and working registration CTAs', (
   assert.match(businessReady, /class="business-ready-mark" aria-hidden="true"/);
   assert.match(businessReady, /data-route="register"/);
   assert.match(faq, /<details open>/);
+});
+
+test('document flow uses browser PDF text parsing instead of image scanning', () => {
+  assert.match(appSource, /pdfjs-dist@6\.3\.289\/build\/pdf\.min\.mjs/);
+  assert.match(appSource, /GlobalWorkerOptions\.workerSrc/);
+  assert.match(appSource, /getDocument\(/);
+  assert.match(appSource, /analyzePdfText/);
+  assert.match(appSource, /Scanned or image-only PDFs are not supported/);
 });

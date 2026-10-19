@@ -6,6 +6,97 @@ export function isValidEmail(value = '') {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function cleanPdfFieldValue(value = '') {
+  return String(value ?? '').replace(/\s+/g, ' ').trim().replace(/[|]+$/g, '').trim();
+}
+
+function readPdfField(lines, labelPatterns = []) {
+  const labels = labelPatterns.join('|');
+  const inlinePattern = new RegExp(`^\\s*(?:${labels})\\s*(?::|-)\\s*(.+?)\\s*$`, 'i');
+  const labelOnlyPattern = new RegExp(`^\\s*(?:${labels})\\s*$`, 'i');
+  const labelWithValuePattern = new RegExp(`^\\s*(?:${labels})\\s+(.+?)\\s*$`, 'i');
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const inlineMatch = line.match(inlinePattern);
+    if (inlineMatch) return cleanPdfFieldValue(inlineMatch[1]);
+
+    if (labelOnlyPattern.test(line)) {
+      const nextLine = lines.slice(index + 1).find(Boolean);
+      if (nextLine) return cleanPdfFieldValue(nextLine);
+    }
+
+    const valueMatch = line.match(labelWithValuePattern);
+    if (valueMatch) return cleanPdfFieldValue(valueMatch[1]);
+  }
+
+  return '';
+}
+
+export function analyzePdfText({ text = '', pageCount = 1 } = {}) {
+  const normalizedText = String(text ?? '').replace(/\u00a0/g, ' ').replace(/\r/g, '').trim();
+  const parser = 'pdfjs-text';
+  const format = 'pdf-text';
+  const safePageCount = Number.isInteger(pageCount) && pageCount > 0 ? pageCount : 1;
+  const baseResult = {
+    parser,
+    format,
+    pageCount: safePageCount,
+    biometricVerification: false,
+  };
+
+  if (normalizedText.replace(/\s/g, '').length < 12) {
+    return {
+      ...baseResult,
+      status: 'unsupported',
+      confidence: 0,
+      extractedFields: {},
+      legibility: 'no-text',
+      completeness: 'unknown',
+      message: 'No selectable text was found. Scanned or image-only PDFs are not supported.',
+    };
+  }
+
+  const lines = normalizedText.split('\n').map((line) => cleanPdfFieldValue(line)).filter(Boolean);
+  const extractedFields = {};
+  const fullName = readPdfField(lines, ['full\\s+name', 'name']);
+  const dateOfBirth = readPdfField(lines, ['date\\s+of\\s+birth', 'dob', 'birth\\s+date']);
+  const documentNumber = readPdfField(lines, ['id\\s+number', 'id\\s+no\\.?', 'document\\s+number', 'nin']);
+
+  if (fullName) extractedFields.fullName = fullName;
+  if (dateOfBirth) extractedFields.dateOfBirth = dateOfBirth;
+  if (documentNumber) extractedFields.documentNumber = documentNumber;
+
+  const requiredFields = [
+    ['fullName', 'full name'],
+    ['dateOfBirth', 'date of birth'],
+    ['documentNumber', 'ID number'],
+  ];
+  const missingFields = requiredFields.filter(([field]) => !extractedFields[field]);
+
+  if (missingFields.length) {
+    return {
+      ...baseResult,
+      status: 'flagged',
+      confidence: Math.max(0.62, 0.98 - missingFields.length * 0.12),
+      extractedFields,
+      legibility: 'pass',
+      completeness: 'incomplete',
+      message: `PDF text was read, but ${missingFields.map(([, label]) => label).join(', ')} ${missingFields.length === 1 ? 'is' : 'are'} missing. Upload a complete text-based PDF.`,
+    };
+  }
+
+  return {
+    ...baseResult,
+    status: 'passed',
+    confidence: 0.98,
+    extractedFields,
+    legibility: 'pass',
+    completeness: 'complete',
+    message: 'PDF text parsed. The required identity fields are ready for review.',
+  };
+}
+
 const demoBusinessNames = {
   'dangote ventures': {
     status: 'unavailable',
@@ -115,22 +206,24 @@ const localizedCopy = {
       documents: {
         eyebrow: 'Step 2 of 3 · Document check',
         heading: 'Let’s make sure your documents are ready.',
-        intro: 'Upload clear copies of the documents needed for your Business Name application. This demo checks format, readability, and sample OCR fields before the next step.',
-        guide: 'A clear document now means less back-and-forth later. Choose a file or use a demo file for this prototype.',
-        verificationNote: 'This client demo checks file format, legibility, completeness, and extracted text. It does not perform government biometric identity verification.',
-        identityTitle: 'Government-issued identity document',
-        identityDescription: 'National ID, driver’s licence, or international passport',
-        passportTitle: 'Passport photograph',
-        passportDescription: 'A recent, clear photo with a plain background',
+        intro: 'Upload a selectable-text identity PDF. This browser-only demo reads the PDF text directly; it does not scan images or call a backend.',
+        guide: 'A text-based PDF keeps the check clear and local. Scanned or image-only PDFs are not supported.',
+        verificationNote: 'This client demo parses selectable text from identity PDFs in your browser. Scanned/image-only PDFs are not supported. It does not perform government biometric identity verification.',
+        identityTitle: 'Text-based identity PDF',
+        identityDescription: 'A selectable-text PDF, not a scanned image',
+        passportTitle: 'Passport photograph (separate quality check)',
+        passportDescription: 'A recent, clear JPG or PNG photo; it is not parsed as OCR',
         ready: 'Ready',
+        processing: 'Reading PDF text',
         flagged: 'Review needed',
+        unsupported: 'PDF text required',
         pending: 'Pending',
         choose: 'Choose file',
         replace: 'Replace file',
         demo: 'Use demo file',
         back: 'Back',
         continue: 'Review application',
-        note: 'Keep each file clear and under 5 MB for this prototype.',
+        note: 'Use a text-based PDF for identity data. Keep each file under 5 MB.',
         items: [
           { title: 'Identity document', body: 'Prepare a government-issued identity document such as a National ID, driver’s licence, or passport.' },
           { title: 'Passport photograph', body: 'Use a recent JPG or PNG photo with a plain background.' },
@@ -641,17 +734,15 @@ export function validateDocumentFile({
   const normalizedName = String(name ?? '').toLowerCase();
   const normalizedMimeType = String(mimeType ?? '').toLowerCase();
   const isPassport = documentType === 'passport';
-  const allowedMimeTypes = isPassport
-    ? new Set(['image/jpeg', 'image/png'])
-    : new Set(['application/pdf', 'image/jpeg', 'image/png']);
-  const allowedExtensions = isPassport ? /\.(jpe?g|png)$/ : /\.(pdf|jpe?g|png)$/;
+  const allowedMimeTypes = isPassport ? new Set(['image/jpeg', 'image/png']) : new Set(['application/pdf']);
+  const allowedExtensions = isPassport ? /\.(jpe?g|png)$/ : /\.pdf$/;
 
   if (!name || !allowedMimeTypes.has(normalizedMimeType) || !allowedExtensions.test(normalizedName)) {
     return {
       valid: false,
       message: isPassport
         ? 'Use a JPG or PNG image for the passport photograph.'
-        : 'Use a PDF, JPG, or PNG file for the identity document.',
+        : 'Use a selectable-text PDF for the identity document. Scanned image files are not supported.',
     };
   }
   if (!Number.isFinite(size) || size <= 0) {
@@ -673,7 +764,7 @@ export function verifyDocumentReadiness({
   const fileCheck = validateDocumentFile({ documentType, name, mimeType, size });
   if (!fileCheck.valid) {
     return {
-      status: 'flagged',
+      status: documentType === 'identity' ? 'unsupported' : 'flagged',
       confidence: 0,
       extractedFields: {},
       legibility: 'unknown',
@@ -681,6 +772,20 @@ export function verifyDocumentReadiness({
       format: 'invalid',
       biometricVerification: false,
       message: fileCheck.message,
+    };
+  }
+
+  if (documentType === 'identity') {
+    return {
+      status: 'unsupported',
+      confidence: 0,
+      extractedFields: {},
+      legibility: 'not-parsed',
+      completeness: 'unknown',
+      format: 'pdf-text',
+      parser: 'pdfjs-text',
+      biometricVerification: false,
+      message: 'Identity PDF text must be parsed in the browser before it can continue.',
     };
   }
 

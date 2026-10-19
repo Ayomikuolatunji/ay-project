@@ -664,6 +664,12 @@ em { color: var(--orange); font-family: Georgia, "Times New Roman", serif; font-
 
 .document-status.is-failed i { background: #c75e4a; }
 
+.document-row.is-processing { border-color: rgba(106, 83, 145, .42); }
+
+.document-row.is-processing .document-status { color: var(--purple); }
+
+.document-row.is-processing .document-status i { background: var(--purple); }
+
 .document-error { display: block; margin-top: 5px; color: #c75e4a; font-size: 9px; line-height: 1.35; }
 
 .document-result { display: block; color: var(--purple); font-size: 8px; font-weight: 700; white-space: nowrap; }
@@ -1505,11 +1511,13 @@ body :is(.preview-chat-heading strong, .preview-chat-heading small, .preview-nam
 
 .document-result {
   display: grid;
-  min-width: 180px;
+  max-width: 100%;
+  min-width: min(180px, 100%);
   gap: 2px;
   color: var(--purple);
   font-size: 14px !important;
   line-height: 1.35;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 
@@ -1517,6 +1525,11 @@ body :is(.preview-chat-heading strong, .preview-chat-heading small, .preview-nam
 .document-result span {
   display: block;
   font-size: 14px !important;
+}
+
+.document-result-message {
+  color: var(--ink-soft);
+  font-weight: 500;
 }
 
 .dashboard-next-action {

@@ -9,9 +9,11 @@ import {
   getRegistrationGuidance,
   getRegistrationProgress,
   getRegulAIReply,
+  analyzePdfText,
   canAdvanceToPayment,
   isValidEmail,
   normalizeBusinessName,
+  validateDocumentFile,
   validateRegistrationDetails,
   verifyDocumentReadiness,
 } from './app-core.js';
@@ -53,6 +55,58 @@ const publicNav = document.querySelector('.public-nav');
 const mobileMenuButton = document.querySelector('.mobile-menu-button');
 const mobileMenu = document.querySelector('[data-mobile-menu]');
 const landingNavLinks = [...document.querySelectorAll('[data-nav-scroll]')];
+const PDFJS_MODULE_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.min.mjs';
+const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.worker.min.mjs';
+let pdfParserPromise;
+
+async function loadPdfParser() {
+  if (!pdfParserPromise) {
+    pdfParserPromise = import(PDFJS_MODULE_URL)
+      .then((pdfjsLib) => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+        return pdfjsLib;
+      })
+      .catch((error) => {
+        pdfParserPromise = null;
+        throw error;
+      });
+  }
+  return pdfParserPromise;
+}
+
+function formatPdfTextItems(items = []) {
+  const rows = [];
+  items.forEach((item) => {
+    const text = String(item?.str || '').trim();
+    if (!text) return;
+    const x = Number(item?.transform?.[4]) || 0;
+    const y = Number(item?.transform?.[5]) || 0;
+    const row = rows.find((candidate) => Math.abs(candidate.y - y) < 2);
+    if (row) row.items.push({ x, text });
+    else rows.push({ y, items: [{ x, text }] });
+  });
+
+  return rows
+    .sort((first, second) => second.y - first.y)
+    .map((row) => row.items.sort((first, second) => first.x - second.x).map((item) => item.text).join(' '))
+    .join('\n');
+}
+
+async function extractPdfText(file) {
+  if (file?.pdfText) return { text: file.pdfText, pageCount: 1 };
+  const pdfjsLib = await loadPdfParser();
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const pages = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pages.push(formatPdfTextItems(content.items));
+  }
+
+  return { text: pages.join('\n\n'), pageCount: pdf.numPages };
+}
 
 function setActiveLandingSection(sectionId) {
   landingNavLinks.forEach((link) => {
@@ -680,10 +734,10 @@ function renderDocumentsStep() {
     <p>${escapeHtml(copy.intro)}</p>
   </div>
   ${renderGuideMessage(copy.guide)}
-  <div class="demo-mode-note document-scope-note"><strong>OCR-style readiness only</strong><span>${escapeHtml(copy.verificationNote || 'This client demo checks file format, legibility, completeness, and extracted text. It does not perform government biometric identity verification.')}</span></div>
+  <div class="demo-mode-note document-scope-note"><strong>Browser PDF text check only</strong><span>${escapeHtml(copy.verificationNote || 'This client demo parses selectable text from identity PDFs in your browser. Scanned or image-only PDFs are not supported. It does not perform government biometric identity verification.')}</span></div>
   <form class="flow-form-card" id="document-form">
     <div class="document-list">
-      ${renderDocumentRow('identity', '▤', copy.identityTitle, copy.identityDescription, documents.identity, documentFiles.identity, documentErrors.identity, documentResults.identity, 'application/pdf,image/jpeg,image/png', copy)}
+      ${renderDocumentRow('identity', '▤', copy.identityTitle || 'Text-based identity PDF', copy.identityDescription || 'A selectable-text PDF, not a scanned image', documents.identity, documentFiles.identity, documentErrors.identity, documentResults.identity, 'application/pdf,.pdf', copy)}
       ${renderDocumentRow('passport', '◉', copy.passportTitle, copy.passportDescription, documents.passport, documentFiles.passport, documentErrors.passport, documentResults.passport, 'image/jpeg,image/png', copy)}
     </div>
     <p class="form-error" id="document-error" role="alert"></p>
@@ -693,18 +747,28 @@ function renderDocumentsStep() {
 
 function renderDocumentRow(id, icon, title, description, status = 'pending', file = null, error = '', result = null, accept = '', copy = {}) {
   const passed = status === 'passed';
-  const flagged = status === 'flagged' || status === 'failed';
-  const statusLabel = passed ? (copy.ready || 'Ready') : flagged ? (copy.flagged || 'Review needed') : (copy.pending || 'Pending');
+  const processing = status === 'processing';
+  const flagged = status === 'flagged' || status === 'failed' || status === 'unsupported';
+  const statusLabel = passed
+    ? (copy.ready || 'Ready')
+    : processing
+      ? (copy.processing || 'Reading file')
+      : status === 'unsupported'
+        ? (copy.unsupported || 'PDF text required')
+        : flagged
+          ? (copy.flagged || 'Review needed')
+          : (copy.pending || 'Pending');
   const fileLabel = file?.name
     ? `${escapeHtml(file.name)}${Number(file.size) > 0 ? ` · ${formatFileSize(file.size)}` : ''}`
     : escapeHtml(description);
   const extractedFields = Object.entries(result?.extractedFields || {})
-    .map(([field, value]) => `${field === 'fullName' ? 'Name' : field === 'documentNumber' ? 'ID number' : 'Photo'}: ${value}`)
+    .map(([field, value]) => `${field === 'fullName' ? 'Name' : field === 'dateOfBirth' ? 'Date of birth' : field === 'documentNumber' ? 'ID number' : 'Photo'}: ${value}`)
     .join(' · ');
+  const resultLabel = id === 'identity' || result?.parser === 'pdfjs-text' ? 'PDF text check' : 'Photo quality check';
   const resultMarkup = result
-    ? `<div class="document-result"><strong>OCR-style check · ${Math.round((result.confidence || 0) * 100)}% confidence</strong><span>Format: ${result.format || 'unknown'} · Readability: ${result.legibility || 'unknown'} · Completeness: ${result.completeness || 'unknown'}</span>${extractedFields ? `<span>${escapeHtml(extractedFields)}</span>` : ''}</div>`
+    ? `<div class="document-result"><strong>${resultLabel} · ${Math.round((result.confidence || 0) * 100)}% confidence</strong><span>Format: ${result.format || 'unknown'} · Readability: ${result.legibility || 'unknown'} · Completeness: ${result.completeness || 'unknown'}</span>${extractedFields ? `<span>${escapeHtml(extractedFields)}</span>` : ''}${result.message && !error ? `<span class="document-result-message">${escapeHtml(result.message)}</span>` : ''}</div>`
     : '';
-  return `<div class="document-row ${flagged ? 'has-error' : ''}">
+  return `<div class="document-row ${flagged ? 'has-error' : ''} ${processing ? 'is-processing' : ''}">
     <span class="document-icon" aria-hidden="true">${icon}</span>
     <div class="document-copy"><strong>${title}</strong><span>${fileLabel}</span>${error ? `<small class="document-error" role="alert">${escapeHtml(error)}</small>` : ''}</div>
     <span class="document-status ${passed ? 'is-passed' : ''} ${flagged ? 'is-failed' : ''}"><i></i>${statusLabel}</span>
@@ -737,11 +801,23 @@ function ensureDocumentState() {
 }
 
 const demoDocumentFiles = {
-  identity: { name: 'ayo-identity.pdf', mimeType: 'application/pdf', size: 1_200_000 },
+  identity: {
+    name: 'ayo-identity.pdf',
+    mimeType: 'application/pdf',
+    size: 1_200_000,
+    pdfText: [
+      'FULL NAME',
+      'AYODELE MIRACLE PETER',
+      'DATE OF BIRTH',
+      '12/03/1994',
+      'ID NUMBER',
+      'NIN 12345678901',
+    ].join('\n'),
+  },
   passport: { name: 'ayo-passport.jpg', mimeType: 'image/jpeg', size: 850_000 },
 };
 
-function applyDocumentFile(documentType, file) {
+async function applyDocumentFile(documentType, file) {
   ensureUser();
   ensureDocumentState();
   const metadata = {
@@ -749,8 +825,54 @@ function applyDocumentFile(documentType, file) {
     mimeType: String(file?.type || file?.mimeType || ''),
     size: Number(file?.size) || 0,
   };
-  const result = verifyDocumentReadiness({ documentType, ...metadata });
+  const fileCheck = validateDocumentFile({ documentType, ...metadata });
+
+  if (!fileCheck.valid) {
+    const result = verifyDocumentReadiness({ documentType, ...metadata });
+    state.draft.documentFiles[documentType] = metadata;
+    state.draft.documents[documentType] = result.status;
+    state.draft.documentErrors[documentType] = result.message;
+    state.draft.documentResults[documentType] = result;
+    saveState();
+    renderRegistration();
+    showToast(result.message);
+    return;
+  }
+
   state.draft.documentFiles[documentType] = metadata;
+  state.draft.documents[documentType] = 'processing';
+  state.draft.documentErrors[documentType] = '';
+  state.draft.documentResults[documentType] = {
+    status: 'processing',
+    confidence: 0,
+    extractedFields: {},
+    legibility: 'processing',
+    completeness: 'processing',
+    format: documentType === 'identity' ? 'pdf-text' : 'image',
+    parser: documentType === 'identity' ? 'pdfjs-text' : 'file-readiness',
+    biometricVerification: false,
+    message: documentType === 'identity' ? 'Reading selectable text from this PDF in your browser.' : 'Checking the photo file locally.',
+  };
+  saveState();
+  renderRegistration();
+
+  let result;
+  try {
+    if (documentType === 'identity') {
+      const extracted = await extractPdfText(file);
+      result = analyzePdfText(extracted);
+    } else {
+      result = verifyDocumentReadiness({ documentType, ...metadata });
+    }
+  } catch {
+    result = {
+      ...analyzePdfText({ text: '', pageCount: 1 }),
+      status: 'failed',
+      legibility: 'failed',
+      message: 'This PDF could not be opened in the browser. Upload a valid text-based PDF.',
+    };
+  }
+
   state.draft.documents[documentType] = result.status;
   state.draft.documentErrors[documentType] = result.status === 'passed' ? '' : result.message;
   state.draft.documentResults[documentType] = result;
@@ -1129,9 +1251,12 @@ function handleDocumentSubmit() {
   const documents = state.draft?.documents || {};
   if (!canAdvanceToPayment(documents)) {
     const flagged = Object.values(documents).some((status) => status === 'flagged' || status === 'failed');
-    setError('#document-error', flagged
-      ? 'Resolve the flagged document checks and re-upload before continuing to payment.'
-      : 'Choose a valid file or use a demo file for both documents before continuing.');
+    const processing = Object.values(documents).some((status) => status === 'processing');
+    setError('#document-error', processing
+      ? 'Wait for the browser PDF text check to finish before continuing.'
+      : flagged
+        ? 'Resolve the flagged document checks and re-upload before continuing to payment.'
+        : 'Choose a valid file or use a demo file for both documents before continuing.');
     return;
   }
 
